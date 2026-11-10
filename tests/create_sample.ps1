@@ -1,10 +1,20 @@
-# Helper to generate a blank/sample ODT file with generic text
+# Helper to generate a sample ODT or DOCX file with generic text
 param(
     [string]$OutputPath = "sample.odt"
 )
 
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+$converterPath = Join-Path $PSScriptRoot "..\sidecars\doc_editor\doc_converter.ps1"
+if (Test-Path $converterPath) {
+    . $converterPath
+    $sampleHtml = '<h1>Sample Document</h1><p>Welcome to Antigravity Document Editor. This is a generic sample document.</p><h2>1. Overview</h2><p>This document can be used to test viewing, formatting, and live disk saving.</p>'
+    New-BlankDocument -Path $OutputPath | Out-Null
+    Convert-HtmlToDocument -Path $OutputPath -HtmlContent $sampleHtml
+    Write-Host "Created generic sample document at $OutputPath"
+    exit 0
+}
 
 if (Test-Path $OutputPath) {
     Remove-Item -Path $OutputPath -Force
@@ -34,7 +44,7 @@ $sampleContent = @'
   <office:body>
     <office:text>
       <text:h text:outline-level="1">Sample Document</text:h>
-      <text:p>Welcome to Antigravity ODT Editor. This is a generic sample document.</text:p>
+      <text:p>Welcome to Antigravity Document Editor. This is a generic sample document.</text:p>
       <text:h text:outline-level="2">1. Overview</text:h>
       <text:p>This document can be used to test viewing, formatting, and live disk saving.</text:p>
     </office:text>

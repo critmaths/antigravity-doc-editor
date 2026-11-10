@@ -1,0 +1,24 @@
+{
+  "name": "doc_editor",
+  "command": "powershell",
+  "args": [
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "sidecars/doc_editor/server.ps1",
+    "-Port",
+    "58912"
+  ],
+  "port": 58912,
+  "has_web_ui": true,
+  "ui_config": {
+    "views": [
+      {
+        "title": "Document Editor",
+        "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE",
+        "path": "/ui.html"
+      }
+    ]
+  }
+}

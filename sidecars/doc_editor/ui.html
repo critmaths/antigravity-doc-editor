@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigravity Document Editor</title>
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Header Bar -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="brand">
+          <span class="brand-icon">&#x1F4C4;</span>
+          <span class="brand-name">Document Editor</span>
+        </div>
+        <div class="doc-meta">
+          <input type="text" id="doc-title" class="doc-title-input" value="Untitled Document" placeholder="Document Title" title="Document Title">
+          <span id="doc-format-badge" class="format-badge format-odt" title="Document Format">ODT</span>
+        </div>
+      </div>
+      <div class="header-center">
+        <select id="doc-selector" class="doc-selector-dropdown" title="Open recent document">
+          <option value="">-- Choose document --</option>
+        </select>
+      </div>
+      <div class="header-right">
+        <span id="save-status" class="save-status">Saved</span>
+        <button id="btn-new" class="btn-action" title="Create New Document">&#x2795; New</button>
+        <button id="btn-save" class="btn-action primary" title="Save Document (Ctrl+S)">&#x1F4BE; Save</button>
+        <div class="dropdown-wrapper">
+          <button id="btn-save-as" class="btn-action" title="Save As / Export">&#x2913; Export &#x25BE;</button>
+          <div id="save-as-menu" class="dropdown-menu hidden">
+            <button type="button" class="dropdown-item" data-export="docx">&#x1F4DD; Export as Word (.docx)</button>
+            <button type="button" class="dropdown-item" data-export="odt">&#x1F4C4; Export as OpenDocument (.odt)</button>
+            <button type="button" class="dropdown-item" data-export="md">&#x2193; Export as Markdown (.md)</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Formatting Toolbar -->
+    <nav class="toolbar" role="toolbar" aria-label="Editor Formatting">
+      <div class="toolbar-group">
+        <button id="btn-undo" class="btn-tool" type="button" title="Undo (Ctrl+Z)">&#x21BA;</button>
+        <button id="btn-redo" class="btn-tool" type="button" title="Redo (Ctrl+Y)">&#x21BB;</button>
+      </div>
+      <div class="toolbar-divider"></div>
+      <div class="toolbar-group">
+        <select id="heading-select" class="tool-select" title="Paragraph Style">
+          <option value="p">Paragraph</option>
+          <option value="h1">Heading 1</option>
+          <option value="h2">Heading 2</option>
+          <option value="h3">Heading 3</option>
+          <option value="blockquote">Quote</option>
+        </select>
+        <select id="font-family-select" class="tool-select" title="Font Family">
+          <option value="Calibri, sans-serif">Calibri</option>
+          <option value="Arial, sans-serif">Arial</option>
+          <option value="'Times New Roman', serif">Times New Roman</option>
+          <option value="'Georgia', serif">Georgia</option>
+          <option value="'Segoe UI', sans-serif">Segoe UI</option>
+          <option value="'Courier New', monospace">Courier New</option>
+        </select>
+        <select id="font-size-select" class="tool-select" title="Font Size">
+          <option value="9pt">9</option>
+          <option value="10pt">10</option>
+          <option value="11pt" selected>11</option>
+          <option value="12pt">12</option>
+          <option value="14pt">14</option>
+          <option value="18pt">18</option>
+          <option value="24pt">24</option>
+          <option value="32pt">32</option>
+        </select>
+      </div>
+      <div class="toolbar-divider"></div>
+      <div class="toolbar-group">
+        <button id="btn-bold" class="btn-tool" type="button" title="Bold (Ctrl+B)"><b>B</b></button>
+        <button id="btn-italic" class="btn-tool" type="button" title="Italic (Ctrl+I)"><i>I</i></button>
+        <button id="btn-underline" class="btn-tool" type="button" title="Underline (Ctrl+U)"><u>U</u></button>
+        <button id="btn-strike" class="btn-tool" type="button" title="Strikethrough"><s>S</s></button>
+      </div>
+      <div class="toolbar-divider"></div>
+      <div class="toolbar-group">
+        <label class="color-picker-label" title="Text Color">
+          <span class="color-icon">A</span>
+          <input type="color" id="color-picker" value="#1e293b">
+        </label>
+        <label class="color-picker-label" title="Highlight Color">
+          <span class="color-icon highlight">&#x270E;</span>
+          <input type="color" id="highlight-picker" value="#fef08a">
+        </label>
+      </div>
+      <div class="toolbar-divider"></div>
+      <div class="toolbar-group">
+        <button id="btn-align-left" class="btn-tool" type="button" title="Align Left">&#x2261;</button>
+        <button id="btn-align-center" class="btn-tool" type="button" title="Align Center">&#x224B;</button>
+        <button id="btn-align-right" class="btn-tool" type="button" title="Align Right">&#x2263;</button>
+        <button id="btn-align-justify" class="btn-tool" type="button" title="Justify">&#x2267;</button>
+      </div>
+      <div class="toolbar-divider"></div>
+      <div class="toolbar-group">
+        <button id="btn-list-ul" class="btn-tool" type="button" title="Bullet List">&#x2022;&#x2261;</button>
+        <button id="btn-list-ol" class="btn-tool" type="button" title="Numbered List">1.&#x2261;</button>
+        <button id="btn-link" class="btn-tool" type="button" title="Insert Link">&#x1F517;</button>
+        <button id="btn-table" class="btn-tool" type="button" title="Insert Table">&#x229E;</button>
+        <button id="btn-clear-format" class="btn-tool" type="button" title="Clear Formatting">&#x232B;</button>
+      </div>
+    </nav>
+
+    <!-- Editor Viewport -->
+    <main class="editor-viewport">
+      <div class="paper-sheet">
+        <div id="editor-canvas" class="editor-content" contenteditable="true" spellcheck="true"></div>
+      </div>
+    </main>
+
+    <!-- In-Page Modal Dialog -->
+    <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 id="modal-title">Modal Title</h3>
+        </div>
+        <div id="modal-body" class="modal-body">
+          <!-- Dynamic Content -->
+        </div>
+        <div class="modal-footer">
+          <button id="modal-cancel" class="btn-action" type="button">Cancel</button>
+          <button id="modal-confirm" class="btn-action primary" type="button">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="editor.js"></script>
+</body>
+</html>

@@ -1,11 +1,18 @@
 {
-  "name": "odt-editor",
-  "displayName": "ODT Document Editor",
-  "description": "Preview, format, and edit OpenDocument Text (.odt) documents directly in Antigravity with live disk sync.",
-  "version": "1.0.0",
-  "suggestedPrompts": [
-    "Open sample.odt in the editor",
-    "Preview this .odt file",
-    "Edit the ODT document outline"
+  "name": "doc-editor",
+  "displayName": "Antigravity Document Editor",
+  "version": "2.0.0",
+  "description": "Interactive visual document editor and viewer for Antigravity. Full WYSIWYG editing, formatting, live disk saving, and cross-format conversion for Word (.docx) and OpenDocument (.odt) documents, plus Markdown (.md) export.",
+  "author": "critmaths",
+  "keywords": [
+    "document",
+    "editor",
+    "docx",
+    "odt",
+    "word",
+    "opendocument",
+    "markdown",
+    "sidecar",
+    "wysiwyg"
   ]
 }

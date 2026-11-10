@@ -1,9 +1,14 @@
 # Temporary test files
 *.bak
 *.tmp
-temp_*.odt
-server_test_temp.odt
-test_review_temp.odt
+temp_*
+server_test_*
+test_review_*
+e2e_*
+tests/sample.*
+tests/*.odt
+tests/*.docx
+tests/*.md
 *.log
 
 # Windows thumbnail & desktop caches

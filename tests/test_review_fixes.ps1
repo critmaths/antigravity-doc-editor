@@ -3,8 +3,8 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PluginDir = Split-Path -Parent $ScriptDir
-$ConverterScript = Join-Path $PluginDir "sidecars\odt_editor\odt_converter.ps1"
-$ServerScript = Join-Path $PluginDir "sidecars\odt_editor\server.ps1"
+$ConverterScript = Join-Path $PluginDir "sidecars\doc_editor\doc_converter.ps1"
+$ServerScript = Join-Path $PluginDir "sidecars\doc_editor\server.ps1"
 $CreateSampleScript = Join-Path $ScriptDir "create_sample.ps1"
 $SampleOdt = Join-Path $ScriptDir "sample.odt"
 $TempOdt = Join-Path $ScriptDir "test_review_temp.odt"
