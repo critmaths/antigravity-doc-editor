@@ -1,0 +1,11 @@
+# Temporary test files
+*.bak
+*.tmp
+temp_*.odt
+server_test_temp.odt
+test_review_temp.odt
+*.log
+
+# Windows thumbnail & desktop caches
+Thumbs.db
+Desktop.ini

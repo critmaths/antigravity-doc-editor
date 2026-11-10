@@ -1,0 +1,24 @@
+{
+  "command": "powershell",
+  "args": [
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "server.ps1"
+  ],
+  "description": "Interactive in-IDE OpenDocument Text (.odt) viewer and WYSIWYG editor",
+  "display_name": "ODT Document Editor",
+  "has_web_ui": true,
+  "restart_policy": "always",
+  "ui_config": {
+    "display_name": "ODT Document Editor",
+    "views": [
+      {
+        "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE",
+        "path": "/ui.html",
+        "title": "ODT Document Editor"
+      }
+    ]
+  }
+}

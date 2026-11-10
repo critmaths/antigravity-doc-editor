@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigravity ODT Editor</title>
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body class="odt-app">
+  <header class="app-header">
+    <div class="header-left">
+      <div class="doc-icon">📄</div>
+      <div class="doc-meta">
+        <h1 id="doc-title" class="doc-title" contenteditable="false">Loading Document...</h1>
+        <div class="doc-path-row">
+          <select id="doc-selector" class="doc-selector" title="Switch document"></select>
+          <span id="save-status" class="save-status">Saved</span>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <button id="btn-save" class="btn-primary" title="Save changes (Ctrl+S)">
+        <span class="btn-icon">💾</span> Save
+      </button>
+    </div>
+  </header>
+
+  <!-- Formatting Toolbar -->
+  <div class="toolbar" role="toolbar" aria-label="Text Formatting">
+    <div class="toolbar-group">
+      <select id="heading-select" class="tool-select" title="Text Style">
+        <option value="p">Normal Text</option>
+        <option value="h1">Heading 1</option>
+        <option value="h2">Heading 2</option>
+        <option value="h3">Heading 3</option>
+        <option value="blockquote">Quote</option>
+      </select>
+      
+      <select id="font-family-select" class="tool-select" title="Font Family">
+        <option value="'Inter', sans-serif">Inter</option>
+        <option value="'Calibri', sans-serif">Calibri</option>
+        <option value="'Arial', sans-serif">Arial</option>
+        <option value="'Times New Roman', serif">Times New Roman</option>
+        <option value="'Georgia', serif">Georgia</option>
+        <option value="'Roboto Mono', monospace">Monospace</option>
+      </select>
+
+      <select id="font-size-select" class="tool-select" title="Font Size">
+        <option value="2">10pt</option>
+        <option value="3" selected>12pt</option>
+        <option value="4">14pt</option>
+        <option value="5">18pt</option>
+        <option value="6">24pt</option>
+        <option value="7">32pt</option>
+      </select>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <div class="toolbar-group">
+      <button id="btn-bold" class="btn-tool" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+      <button id="btn-italic" class="btn-tool" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+      <button id="btn-underline" class="btn-tool" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+      <button id="btn-strike" class="btn-tool" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <div class="toolbar-group">
+      <label class="color-picker-label" title="Text Color">
+        <span class="color-icon">A</span>
+        <input type="color" id="color-picker" class="color-input" value="#111827">
+      </label>
+      <label class="color-picker-label" title="Highlight Color">
+        <span class="color-icon highlight-icon">🖊️</span>
+        <input type="color" id="highlight-picker" class="color-input" value="#fef08a">
+      </label>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <div class="toolbar-group">
+      <button class="btn-tool" data-cmd="justifyLeft" title="Align Left">⯬</button>
+      <button class="btn-tool" data-cmd="justifyCenter" title="Align Center">☰</button>
+      <button class="btn-tool" data-cmd="justifyRight" title="Align Right">⯮</button>
+      <button class="btn-tool" data-cmd="justifyFull" title="Justify">☷</button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <div class="toolbar-group">
+      <button class="btn-tool" data-cmd="insertUnorderedList" title="Bulleted List">• List</button>
+      <button class="btn-tool" data-cmd="insertOrderedList" title="Numbered List">1. List</button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <div class="toolbar-group">
+      <button class="btn-tool" data-cmd="undo" title="Undo (Ctrl+Z)">↺</button>
+      <button class="btn-tool" data-cmd="redo" title="Redo (Ctrl+Y)">↻</button>
+    </div>
+  </div>
+
+  <!-- Document Canvas Container -->
+  <main class="canvas-viewport">
+    <div class="paper-sheet-container">
+      <div id="editor-canvas" class="paper-sheet" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true">
+        <p class="placeholder-text">Loading document content...</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Bottom Notification Bar -->
+  <footer class="app-footer">
+    <span id="footer-path" class="footer-text">Ready</span>
+    <span class="footer-tip">Tip: Press Ctrl+S to save directly to disk</span>
+  </footer>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="editor.js"></script>
+</body>
+</html>
