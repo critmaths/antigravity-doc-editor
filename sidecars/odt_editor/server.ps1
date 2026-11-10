@@ -153,7 +153,7 @@ while ($Listener.IsListening) {
         }
         elseif ($path -eq "/api/documents" -and $method -eq "GET") {
             $searchDirs = @(
-                "C:\Users\critm\.gemini\antigravity\scratch",
+                (Join-Path $HOME ".gemini\antigravity\scratch"),
                 (Get-Location).Path
             )
             $foundFiles = @()

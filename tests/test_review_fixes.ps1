@@ -1,11 +1,15 @@
 # Test to reproduce and verify fixes for code review findings
 $ErrorActionPreference = "Stop"
 
-$PluginDir = "C:\Users\critm\.gemini\config\plugins\odt-editor"
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$PluginDir = Split-Path -Parent $ScriptDir
 $ConverterScript = Join-Path $PluginDir "sidecars\odt_editor\odt_converter.ps1"
 $ServerScript = Join-Path $PluginDir "sidecars\odt_editor\server.ps1"
-$SampleOdt = "C:\Users\critm\.gemini\antigravity\scratch\New Big or Medium Project.odt"
-$TempOdt = "C:\Users\critm\.gemini\antigravity\scratch\tests\test_review_temp.odt"
+$CreateSampleScript = Join-Path $ScriptDir "create_sample.ps1"
+$SampleOdt = Join-Path $ScriptDir "sample.odt"
+$TempOdt = Join-Path $ScriptDir "test_review_temp.odt"
+
+& $CreateSampleScript -OutputPath $SampleOdt
 Copy-Item -Path $SampleOdt -Destination $TempOdt -Force
 
 . $ConverterScript
@@ -50,7 +54,7 @@ Write-Host "Test 2 Passed: HTML entities and rich formatting preserved in ODF XM
 
 Write-Host "=== Test 3: Critical-1 & Important-1 Server /api/documents and Path Validation ==="
 # Test PSCustomObject serialization logic
-$searchDirs = @("C:\Users\critm\.gemini\antigravity\scratch")
+$searchDirs = @($ScriptDir)
 $foundFiles = @()
 foreach ($dir in $searchDirs) {
     if (Test-Path $dir) {
@@ -73,5 +77,5 @@ if (-not $parsed.files -or -not $parsed.files[0].path) {
 Write-Host "Test 3 Passed: /api/documents formats file list with valid properties"
 
 # Clean up
-Remove-Item -Path $TempOdt -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $TempOdt, $SampleOdt -Force -ErrorAction SilentlyContinue
 Write-Host "=== ALL CODE REVIEW TEST CHECKS PASSED ==="

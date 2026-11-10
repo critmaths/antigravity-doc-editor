@@ -1,26 +1,28 @@
 # End-to-End verification script for ODT Editor plugin
 $ErrorActionPreference = "Stop"
 
-$ScratchDir = "C:\Users\critm\.gemini\antigravity\scratch"
-$TargetOdt = Join-Path $ScratchDir "New Big or Medium Project.odt"
-$BackupOdt = Join-Path $ScratchDir "New Big or Medium Project.odt.bak"
-$PluginDir = "C:\Users\critm\.gemini\config\plugins\odt-editor"
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$PluginDir = Split-Path -Parent $ScriptDir
 $ServerScript = Join-Path $PluginDir "sidecars\odt_editor\server.ps1"
 $ConverterScript = Join-Path $PluginDir "sidecars\odt_editor\odt_converter.ps1"
+$CreateSampleScript = Join-Path $ScriptDir "create_sample.ps1"
+$TargetOdt = Join-Path $ScriptDir "sample.odt"
+$BackupOdt = Join-Path $ScriptDir "sample.odt.bak"
 
-Write-Host "=== Step 1: Backing up target ODT ==="
+Write-Host "=== Step 1: Creating fresh generic sample ODT ==="
+& $CreateSampleScript -OutputPath $TargetOdt
 Copy-Item -Path $TargetOdt -Destination $BackupOdt -Force
 
 try {
-    Write-Host "=== Step 2: Testing CLI converter on original document ==="
+    Write-Host "=== Step 2: Testing CLI converter on sample document ==="
     $cliOutput = & $ConverterScript -Read $TargetOdt -Format markdown
-    if ($cliOutput -notmatch "Overview" -or $cliOutput -notmatch "Deliverables") {
+    if ($cliOutput -notmatch "Sample Document" -or $cliOutput -notmatch "Overview") {
         Write-Error "FAIL: CLI converter did not extract expected sections from sample ODT"
     }
-    Write-Host "CLI extraction successful. Found expected outline sections."
+    Write-Host "CLI extraction successful. Found expected sample sections."
 
     Write-Host "=== Step 3: Starting Sidecar Server ==="
-    $TestPort = 58919
+    $TestPort = 58929
     $job = Start-Job -ScriptBlock {
         param($s, $p)
         & $s -Port $p
@@ -34,13 +36,13 @@ try {
     # Verify server listening
     $docsJson = $wc.DownloadString("http://127.0.0.1:$TestPort/api/documents")
     $docs = $docsJson | ConvertFrom-Json
-    Write-Host "Found $($docs.files.Count) ODT files in workspace"
+    Write-Host "Found $($docs.files.Count) ODT files in search paths"
 
     Write-Host "=== Step 4: Loading document via HTTP API ==="
     $encodedPath = [System.Net.WebUtility]::UrlEncode($TargetOdt)
     $docJson = $wc.DownloadString("http://127.0.0.1:$TestPort/api/document?path=$encodedPath")
     $doc = $docJson | ConvertFrom-Json
-    if (-not $doc.html -or $doc.html -notmatch "Overview") {
+    if (-not $doc.html -or $doc.html -notmatch "Sample Document") {
         Write-Error "FAIL: HTTP API did not return document HTML"
     }
     Write-Host "Document loaded via HTTP API. Length: $($doc.html.Length) chars"
@@ -69,9 +71,6 @@ try {
     }
     Write-Host "Saved modification verified on disk!"
 
-    # Restore backup so original sample remains clean
-    Copy-Item -Path $BackupOdt -Destination $TargetOdt -Force
-
     Write-Host "=== ALL END-TO-END TESTS PASSED SUCCESSFULLY! ==="
 } finally {
     try {
@@ -82,5 +81,5 @@ try {
         Stop-Job $job -ErrorAction SilentlyContinue
         Remove-Job $job -Force -ErrorAction SilentlyContinue
     }
-    Remove-Item -Path $BackupOdt -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $BackupOdt, $TargetOdt -Force -ErrorAction SilentlyContinue
 }

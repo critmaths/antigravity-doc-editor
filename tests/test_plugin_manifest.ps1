@@ -1,7 +1,8 @@
 # Test for Antigravity plugin manifest, sidecar configuration, skill, and rules
 $ErrorActionPreference = "Stop"
 
-$PluginDir = "C:\Users\critm\.gemini\config\plugins\odt-editor"
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$PluginDir = Split-Path -Parent $ScriptDir
 $PluginJson = Join-Path $PluginDir "plugin.json"
 $SidecarJson = Join-Path $PluginDir "sidecars\odt_editor\sidecar.json"
 $SkillMd = Join-Path $PluginDir "skills\odt-editor\SKILL.md"

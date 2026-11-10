@@ -7,4 +7,4 @@ When working with OpenDocument Text (`.odt`) files in Antigravity:
    [Open in ODT Document Editor](sidecar://odt-editor/odt_editor/ui.html?file=<URL_ENCODED_PATH>)
    ```
 
-2. **Read documents via CLI**: If the user asks about the document's contents, use `powershell -ExecutionPolicy Bypass -File "C:\Users\critm\.gemini\config\plugins\odt-editor\sidecars\odt_editor\odt_converter.ps1" -Read "<PATH>" -Format markdown` to read and summarize it accurately.
+2. **Read documents via CLI**: If the user asks about the document's contents, use `powershell -ExecutionPolicy Bypass -File "$HOME\.gemini\config\plugins\odt-editor\sidecars\odt_editor\odt_converter.ps1" -Read "<PATH>" -Format markdown` to read and summarize it accurately.

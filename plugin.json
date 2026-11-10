@@ -4,7 +4,7 @@
   "description": "Preview, format, and edit OpenDocument Text (.odt) documents directly in Antigravity with live disk sync.",
   "version": "1.0.0",
   "suggestedPrompts": [
-    "Open New Big or Medium Project.odt in the editor",
+    "Open sample.odt in the editor",
     "Preview this .odt file",
     "Edit the ODT document outline"
   ]

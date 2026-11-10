@@ -15,9 +15,9 @@ When the user asks to **open**, **preview**, **edit**, or **view** an `.odt` fil
 [ODT Document Editor](sidecar://odt-editor/odt_editor/ui.html?file=<URL_ENCODED_PATH>)
 ```
 
-Example for a file in the scratch workspace:
+Example for a document in the workspace:
 ```markdown
-[Open in ODT Editor](sidecar://odt-editor/odt_editor/ui.html?file=C%3A%2FUsers%2Fcritm%2F.gemini%2Fantigravity%2Fscratch%2FNew%20Big%20or%20Medium%20Project.odt)
+[Open in ODT Editor](sidecar://odt-editor/odt_editor/ui.html?file=C%3A%2Fpath%2Fto%2Fsample.odt)
 ```
 
 ## 2. Inspecting Document Content in CLI
@@ -25,7 +25,7 @@ Example for a file in the scratch workspace:
 When you need to read the contents of an `.odt` file to answer questions, summarize, or draft text, execute the converter CLI directly:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "C:\Users\critm\.gemini\config\plugins\odt-editor\sidecars\odt_editor\odt_converter.ps1" -Read "<PATH_TO_ODT>" -Format markdown
+powershell -ExecutionPolicy Bypass -File "$HOME\.gemini\config\plugins\odt-editor\sidecars\odt_editor\odt_converter.ps1" -Read "<PATH_TO_ODT>" -Format markdown
 ```
 
 Formats supported:

@@ -1,7 +1,9 @@
 # Test for UI assets in odt_editor
 $ErrorActionPreference = "Stop"
 
-$SidecarDir = "C:\Users\critm\.gemini\config\plugins\odt-editor\sidecars\odt_editor"
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RepoDir = Split-Path -Parent $ScriptDir
+$SidecarDir = Join-Path $RepoDir "sidecars\odt_editor"
 $UiFile = Join-Path $SidecarDir "ui.html"
 $CssFile = Join-Path $SidecarDir "editor.css"
 $JsFile = Join-Path $SidecarDir "editor.js"

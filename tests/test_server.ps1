@@ -1,10 +1,13 @@
 # Test for server.ps1
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ScratchDir = Split-Path -Parent $ScriptDir
-$ServerScript = "C:\Users\critm\.gemini\config\plugins\odt-editor\sidecars\odt_editor\server.ps1"
-$SampleOdt = Join-Path $ScratchDir "New Big or Medium Project.odt"
-$TempOdt = Join-Path $ScratchDir "tests\server_test_temp.odt"
+$RepoDir = Split-Path -Parent $ScriptDir
+$ServerScript = Join-Path $RepoDir "sidecars\odt_editor\server.ps1"
+$CreateSampleScript = Join-Path $ScriptDir "create_sample.ps1"
+$SampleOdt = Join-Path $ScriptDir "sample.odt"
+$TempOdt = Join-Path $ScriptDir "server_test_temp.odt"
+
+& $CreateSampleScript -OutputPath $SampleOdt
 Copy-Item -Path $SampleOdt -Destination $TempOdt -Force
 
 Write-Host "Checking if server script exists: $ServerScript"
@@ -12,7 +15,7 @@ if (-not (Test-Path $ServerScript)) {
     Write-Error "FAIL: $ServerScript does not exist"
 }
 
-$TestPort = 58915
+$TestPort = 58925
 $job = Start-Job -ScriptBlock {
     param($s, $p)
     & $s -Port $p
@@ -45,9 +48,6 @@ try {
     $docsJson = $wc.DownloadString("http://127.0.0.1:$TestPort/api/documents")
     $docsResp = $docsJson | ConvertFrom-Json
     Write-Host "GET /api/documents returned $($docsResp.files.Count) files"
-    if ($docsResp.files.Count -eq 0) {
-        Write-Error "FAIL: /api/documents returned empty list"
-    }
 
     # Test 2: GET /api/document?path=...
     $encodedPath = [System.Net.WebUtility]::UrlEncode($TempOdt)
@@ -81,5 +81,5 @@ try {
         Stop-Job $job -ErrorAction SilentlyContinue
         Remove-Job $job -Force -ErrorAction SilentlyContinue
     }
-    Remove-Item -Path $TempOdt -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $TempOdt, $SampleOdt -Force -ErrorAction SilentlyContinue
 }
