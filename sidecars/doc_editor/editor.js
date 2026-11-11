@@ -198,6 +198,126 @@
     }
   }
 
+  function setupInlineFolderBrowser(container, folderInput, updatePreview) {
+    const toggleBtn = container.querySelector('.btn-browse-folder');
+    const pillsContainer = container.querySelector('.folder-quick-pills');
+    const explorerEl = container.querySelector('.folder-explorer-box');
+    const subfoldersList = container.querySelector('.subfolders-list');
+    const upBtn = container.querySelector('.btn-explorer-up');
+    const currentPathLabel = container.querySelector('.explorer-current-path');
+    let parentPath = '';
+
+    async function loadDirectory(path) {
+      if (!explorerEl || explorerEl.classList.contains('hidden')) return;
+      subfoldersList.innerHTML = '<div style="padding: 10px; color: var(--text-muted); font-size: 12px;">Loading folders...</div>';
+
+      try {
+        const q = path ? `?path=${encodeURIComponent(path)}` : '';
+        const res = await fetch(`${API_BASE}/api/directories${q}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        parentPath = data.parent || '';
+
+        if (currentPathLabel) currentPathLabel.textContent = data.current || path;
+        if (upBtn) {
+          upBtn.disabled = !data.parent;
+          upBtn.style.opacity = data.parent ? '1' : '0.4';
+        }
+
+        // Render quick location pills if container empty
+        if (pillsContainer && pillsContainer.children.length === 0) {
+          const quicks = (data.quickLocations || []).concat(data.drives || []);
+          quicks.forEach(q => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-action dir-pill';
+            btn.style.cssText = 'font-size: 11px; padding: 3px 8px; border-radius: 12px; margin-right: 4px; margin-bottom: 4px; cursor: pointer;';
+            btn.textContent = (q.name.startsWith('C:') ? '💾 ' : '📁 ') + q.name;
+            btn.addEventListener('click', () => {
+              const p = q.path.endsWith('\\') ? q.path : q.path + '\\';
+              folderInput.value = p;
+              updatePreview();
+              loadDirectory(q.path);
+            });
+            pillsContainer.appendChild(btn);
+          });
+        }
+
+        // Render subfolders
+        subfoldersList.innerHTML = '';
+        const subs = data.subdirectories || [];
+        if (subs.length === 0) {
+          subfoldersList.innerHTML = '<div style="padding: 10px; color: var(--text-muted); font-size: 12px;">No subfolders in this directory</div>';
+        } else {
+          subs.forEach(s => {
+            const item = document.createElement('div');
+            item.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 4px; cursor: pointer; transition: background 0.1s ease; user-select: none;';
+            item.innerHTML = `<span style="font-size: 14px;">📁</span><span style="font-size: 12px; color: #f8fafc; font-weight: 500;">${s.name}</span>`;
+            item.addEventListener('mouseenter', () => item.style.background = '#334155');
+            item.addEventListener('mouseleave', () => item.style.background = 'transparent');
+            item.addEventListener('click', () => {
+              const p = s.path.endsWith('\\') ? s.path : s.path + '\\';
+              folderInput.value = p;
+              updatePreview();
+              loadDirectory(s.path);
+            });
+            subfoldersList.appendChild(item);
+          });
+        }
+      } catch (err) {
+        subfoldersList.innerHTML = `<div style="padding: 10px; color: #ef4444; font-size: 12px;">Error: ${err.message}</div>`;
+      }
+    }
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        explorerEl.classList.toggle('hidden');
+        if (!explorerEl.classList.contains('hidden')) {
+          toggleBtn.textContent = '▲ Close Folders';
+          loadDirectory(folderInput.value.trim());
+        } else {
+          toggleBtn.textContent = '📁 Browse Folders';
+        }
+      });
+    }
+
+    if (upBtn) {
+      upBtn.addEventListener('click', () => {
+        if (parentPath) {
+          const p = parentPath.endsWith('\\') ? parentPath : parentPath + '\\';
+          folderInput.value = p;
+          updatePreview();
+          loadDirectory(parentPath);
+        }
+      });
+    }
+
+    // Pre-populate quick location pills
+    fetch(`${API_BASE}/api/directories`)
+      .then(r => r.json())
+      .then(data => {
+        if (pillsContainer && pillsContainer.children.length === 0 && data.quickLocations) {
+          const quicks = (data.quickLocations || []).concat(data.drives || []);
+          quicks.forEach(q => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-action dir-pill';
+            btn.style.cssText = 'font-size: 11px; padding: 3px 8px; border-radius: 12px; margin-right: 4px; margin-bottom: 4px; cursor: pointer;';
+            btn.textContent = (q.name.startsWith('C:') ? '💾 ' : '📁 ') + q.name;
+            btn.addEventListener('click', () => {
+              const p = q.path.endsWith('\\') ? q.path : q.path + '\\';
+              folderInput.value = p;
+              updatePreview();
+              if (!explorerEl.classList.contains('hidden')) {
+                loadDirectory(q.path);
+              }
+            });
+            pillsContainer.appendChild(btn);
+          });
+        }
+      }).catch(() => {});
+  }
+
   function openDocumentModal() {
     // Collect discovered files for quick-opening
     let recentPills = '';
@@ -271,31 +391,25 @@
   }
 
   function createNewDocument() {
-    const defaultDir = currentDocPath ? currentDocPath.substring(0, currentDocPath.lastIndexOf('\\') + 1) : (knownDirectories[0] || 'C:\\Users\\critm\\.gemini\\antigravity\\scratch\\');
-
-    const quickDirs = [];
-    if (defaultDir) quickDirs.push({ label: 'Current Folder', path: defaultDir });
-    knownDirectories.forEach(d => {
-      if (d && d !== defaultDir && !quickDirs.some(q => q.path === d)) {
-        const segs = d.replace(/\\$/, '').split('\\');
-        const shortName = segs[segs.length - 1] || d;
-        quickDirs.push({ label: shortName, path: d.endsWith('\\') ? d : d + '\\' });
-      }
-    });
-
-    const pillsHtml = quickDirs.map(q => 
-      `<button type="button" class="btn-action dir-pill" data-dir="${q.path}" style="font-size: 11px; padding: 3px 8px; border-radius: 12px; margin-right: 4px; margin-bottom: 4px; cursor: pointer;">${q.label}</button>`
-    ).join('');
+    const defaultDir = currentDocPath ? currentDocPath.substring(0, currentDocPath.lastIndexOf('\\') + 1) : 'C:\\Users\\critm\\.gemini\\antigravity\\scratch\\';
 
     const bodyHtml = `
-      <div style="display: flex; flex-direction: column; gap: 12px;">
+      <div id="new-dialog-container" style="display: flex; flex-direction: column; gap: 12px;">
         <div>
           <label for="new-doc-folder">Destination Folder</label>
           <div style="display: flex; gap: 6px; margin-top: 6px;">
             <input type="text" id="new-doc-folder" value="${defaultDir}" style="flex: 1;">
-            <button type="button" id="btn-browse-new-folder" class="btn-action primary" style="white-space: nowrap; cursor: pointer;">📁 Browse Folder</button>
+            <button type="button" class="btn-action primary btn-browse-folder" style="white-space: nowrap; cursor: pointer;">📁 Browse Folders</button>
           </div>
-          ${pillsHtml ? `<div style="margin-top: 8px; display: flex; flex-wrap: wrap;">${pillsHtml}</div>` : ''}
+          <div class="folder-quick-pills" style="margin-top: 8px; display: flex; flex-wrap: wrap;"></div>
+          <!-- Folder Explorer -->
+          <div class="folder-explorer-box hidden" style="margin-top: 8px; background: #0f172a; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+              <span class="explorer-current-path" style="font-size: 11px; color: var(--text-muted); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;"></span>
+              <button type="button" class="btn-action btn-explorer-up" style="font-size: 11px; padding: 2px 8px; cursor: pointer;">⬆ Up</button>
+            </div>
+            <div class="subfolders-list" style="max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;"></div>
+          </div>
         </div>
         <div>
           <label for="new-doc-name">Document Title / File Name</label>
@@ -354,6 +468,7 @@
       }
     });
 
+    const container = document.getElementById('new-dialog-container');
     const folderInput = document.getElementById('new-doc-folder');
     const nameInput = document.getElementById('new-doc-name');
     const formatSelect = document.getElementById('new-doc-format');
@@ -369,62 +484,33 @@
     nameInput.addEventListener('input', updatePreview);
     formatSelect.addEventListener('change', updatePreview);
 
-    const browseBtn = document.getElementById('btn-browse-new-folder');
-    if (browseBtn && folderImportInput) {
-      browseBtn.addEventListener('click', () => {
-        folderImportInput.onchange = (e) => {
-          const file = e.target.files && e.target.files[0];
-          if (file && file.path) {
-            const dir = file.path.substring(0, file.path.lastIndexOf('\\') + 1);
-            if (dir) {
-              folderInput.value = dir;
-              updatePreview();
-            }
-          }
-        };
-        folderImportInput.value = '';
-        folderImportInput.click();
-      });
-    }
-
-    document.querySelectorAll('.dir-pill').forEach(pill => {
-      pill.addEventListener('click', () => {
-        folderInput.value = pill.getAttribute('data-dir');
-        updatePreview();
-      });
-    });
+    setupInlineFolderBrowser(container, folderInput, updatePreview);
   }
 
   function convertDocument(targetFormat) {
     const ext = targetFormat.toLowerCase();
     const currentName = currentDocPath ? currentDocPath.substring(currentDocPath.lastIndexOf('\\') + 1) : 'document';
     const baseName = currentName.substring(0, currentName.lastIndexOf('.')) || currentName;
-    const defaultDir = currentDocPath ? currentDocPath.substring(0, currentDocPath.lastIndexOf('\\') + 1) : (knownDirectories[0] || 'C:\\Users\\critm\\.gemini\\antigravity\\scratch\\');
+    const defaultDir = currentDocPath ? currentDocPath.substring(0, currentDocPath.lastIndexOf('\\') + 1) : 'C:\\Users\\critm\\.gemini\\antigravity\\scratch\\';
     const suggestedFileName = `${baseName}_exported.${ext}`;
 
-    const quickDirs = [];
-    if (defaultDir) quickDirs.push({ label: 'Current Folder', path: defaultDir });
-    knownDirectories.forEach(d => {
-      if (d && d !== defaultDir && !quickDirs.some(q => q.path === d)) {
-        const segs = d.replace(/\\$/, '').split('\\');
-        const shortName = segs[segs.length - 1] || d;
-        quickDirs.push({ label: shortName, path: d.endsWith('\\') ? d : d + '\\' });
-      }
-    });
-
-    const pillsHtml = quickDirs.map(q => 
-      `<button type="button" class="btn-action dir-pill" data-dir="${q.path}" style="font-size: 11px; padding: 3px 8px; border-radius: 12px; margin-right: 4px; margin-bottom: 4px; cursor: pointer;">${q.label}</button>`
-    ).join('');
-
     const bodyHtml = `
-      <div style="display: flex; flex-direction: column; gap: 12px;">
+      <div id="export-dialog-container" style="display: flex; flex-direction: column; gap: 12px;">
         <div>
           <label for="export-folder-path">Destination Folder</label>
           <div style="display: flex; gap: 6px; margin-top: 6px;">
             <input type="text" id="export-folder-path" value="${defaultDir}" style="flex: 1;">
-            <button type="button" id="btn-browse-export-folder" class="btn-action primary" style="white-space: nowrap; cursor: pointer;">📁 Browse Folder</button>
+            <button type="button" class="btn-action primary btn-browse-folder" style="white-space: nowrap; cursor: pointer;">📁 Browse Folders</button>
           </div>
-          ${pillsHtml ? `<div style="margin-top: 8px; display: flex; flex-wrap: wrap;">${pillsHtml}</div>` : ''}
+          <div class="folder-quick-pills" style="margin-top: 8px; display: flex; flex-wrap: wrap;"></div>
+          <!-- Folder Explorer -->
+          <div class="folder-explorer-box hidden" style="margin-top: 8px; background: #0f172a; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+              <span class="explorer-current-path" style="font-size: 11px; color: var(--text-muted); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;"></span>
+              <button type="button" class="btn-action btn-explorer-up" style="font-size: 11px; padding: 2px 8px; cursor: pointer;">⬆ Up</button>
+            </div>
+            <div class="subfolders-list" style="max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;"></div>
+          </div>
         </div>
         <div>
           <label for="export-file-name">File Name</label>
@@ -482,6 +568,7 @@
       }
     });
 
+    const container = document.getElementById('export-dialog-container');
     const folderInput = document.getElementById('export-folder-path');
     const fileInput = document.getElementById('export-file-name');
     const previewEl = document.getElementById('export-preview-path');
@@ -494,30 +581,7 @@
     folderInput.addEventListener('input', updatePreview);
     fileInput.addEventListener('input', updatePreview);
 
-    const browseBtn = document.getElementById('btn-browse-export-folder');
-    if (browseBtn && folderImportInput) {
-      browseBtn.addEventListener('click', () => {
-        folderImportInput.onchange = (e) => {
-          const file = e.target.files && e.target.files[0];
-          if (file && file.path) {
-            const dir = file.path.substring(0, file.path.lastIndexOf('\\') + 1);
-            if (dir) {
-              folderInput.value = dir;
-              updatePreview();
-            }
-          }
-        };
-        folderImportInput.value = '';
-        folderImportInput.click();
-      });
-    }
-
-    document.querySelectorAll('.dir-pill').forEach(pill => {
-      pill.addEventListener('click', () => {
-        folderInput.value = pill.getAttribute('data-dir');
-        updatePreview();
-      });
-    });
+    setupInlineFolderBrowser(container, folderInput, updatePreview);
   }
 
   async function loadDocumentsList() {

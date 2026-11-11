@@ -176,6 +176,60 @@ while ($running -and $listener.IsListening) {
             continue
         }
 
+        # API: Discover Directories for browsing
+        if ($method -eq "GET" -and $urlPath -eq "/api/directories") {
+            $dirPath = $request.QueryString["path"]
+            if (-not $dirPath -or -not (Test-Path $dirPath)) {
+                $dirPath = "$HOME\Documents"
+                if (-not (Test-Path $dirPath)) {
+                    $dirPath = "$HOME"
+                }
+            }
+
+            try {
+                $item = Get-Item $dirPath
+                $fullPath = $item.FullName
+                $parentPath = if ($item.Parent) { $item.Parent.FullName } else { "" }
+                $subDirs = @()
+                $children = Get-ChildItem -Path $fullPath -Directory -ErrorAction SilentlyContinue | Select-Object -First 60
+                foreach ($c in $children) {
+                    $subDirs += [PSCustomObject]@{
+                        name = $c.Name
+                        path = $c.FullName
+                    }
+                }
+
+                $drives = @()
+                try {
+                    $driveList = [System.IO.DriveInfo]::GetDrives() | Where-Object { $_.IsReady }
+                    foreach ($d in $driveList) {
+                        $drives += [PSCustomObject]@{
+                            name = $d.Name
+                            path = $d.RootDirectory.FullName
+                        }
+                    }
+                } catch {}
+
+                $quickLocations = @(
+                    @{ name = "Documents"; path = "$HOME\Documents" },
+                    @{ name = "Desktop"; path = "$HOME\Desktop" },
+                    @{ name = "Downloads"; path = "$HOME\Downloads" },
+                    @{ name = "Scratch Workspace"; path = "$HOME\.gemini\antigravity\scratch" }
+                ) | Where-Object { Test-Path $_.path }
+
+                Send-JsonResponse -Response $response -Data @{
+                    current = $fullPath
+                    parent = $parentPath
+                    subdirectories = $subDirs
+                    drives = $drives
+                    quickLocations = $quickLocations
+                }
+            } catch {
+                Send-JsonResponse -Response $response -Data @{ error = $_.Exception.Message } -StatusCode 500
+            }
+            continue
+        }
+
         # API: Read Document
         if ($method -eq "GET" -and $urlPath -eq "/api/document") {
             $docPath = $request.QueryString["path"]

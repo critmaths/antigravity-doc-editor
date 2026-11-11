@@ -146,6 +146,14 @@ try {
     }
     Write-Host "POST /api/convert succeeded for both format conversion and Markdown export."
 
+    # Test 6: GET /api/directories
+    $dirsJson = $wc.DownloadString("http://127.0.0.1:$TestPort/api/directories")
+    $dirsResp = $dirsJson | ConvertFrom-Json
+    if (-not $dirsResp.current -or -not $dirsResp.quickLocations) {
+        Write-Error "FAIL: GET /api/directories failed"
+    }
+    Write-Host "GET /api/directories succeeded. Found $($dirsResp.quickLocations.Count) quick locations."
+
     Write-Host "PASS: Task 2 server tests passed!"
 } finally {
     try {
