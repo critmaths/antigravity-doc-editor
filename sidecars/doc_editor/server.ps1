@@ -71,6 +71,9 @@ function Send-FileResponse {
     $Response.ContentType = $ContentType
     $Response.ContentLength64 = $bytes.Length
     $Response.AddHeader("Access-Control-Allow-Origin", "*")
+    $Response.AddHeader("Cache-Control", "no-cache, no-store, must-revalidate")
+    $Response.AddHeader("Pragma", "no-cache")
+    $Response.AddHeader("Expires", "0")
     $Response.OutputStream.Write($bytes, 0, $bytes.Length)
     $Response.OutputStream.Close()
 }
@@ -264,6 +267,42 @@ while ($running -and $listener.IsListening) {
                 }
             } catch {
                 Send-JsonResponse -Response $response -Data @{ error = "Failed to save document: $($_.Exception.Message)" } -StatusCode 500
+            }
+            continue
+        }
+
+        # API: Import Document from client (base64)
+        if ($method -eq "POST" -and $urlPath -eq "/api/import") {
+            $reader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
+            $bodyText = $reader.ReadToEnd()
+            $reader.Close()
+
+            if (-not $bodyText) {
+                Send-JsonResponse -Response $response -Data @{ error = "Empty request body" } -StatusCode 400
+                continue
+            }
+
+            try {
+                $body = $bodyText | ConvertFrom-Json
+                $filename = if ($body.filename) { $body.filename } else { "imported_doc.docx" }
+                $scratchDir = "$HOME\.gemini\antigravity\scratch"
+                if (-not (Test-Path $scratchDir)) {
+                    [void](New-Item -ItemType Directory -Path $scratchDir -Force)
+                }
+                $targetPath = Join-Path $scratchDir $filename
+                $fileBytes = [System.Convert]::FromBase64String($body.base64)
+                [System.IO.File]::WriteAllBytes($targetPath, $fileBytes)
+
+                $doc = Convert-DocumentToHtml -DocPath $targetPath
+                Send-JsonResponse -Response $response -Data @{
+                    path = $targetPath
+                    title = $doc.title
+                    format = $doc.format
+                    html = $doc.html
+                    styles = $doc.styles
+                }
+            } catch {
+                Send-JsonResponse -Response $response -Data @{ error = "Failed to import document: $($_.Exception.Message)" } -StatusCode 500
             }
             continue
         }

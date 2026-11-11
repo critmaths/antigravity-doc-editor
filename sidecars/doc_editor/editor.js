@@ -16,6 +16,7 @@
   let isDirty = false;
   let isSaving = false;
   let modalConfirmCallback = null;
+  let knownDirectories = [];
 
   // DOM Elements
   const docTitleInput = document.getElementById('doc-title');
@@ -24,6 +25,7 @@
   const saveStatus = document.getElementById('save-status');
   const btnOpen = document.getElementById('btn-open');
   const fileImportInput = document.getElementById('file-import-input');
+  const folderImportInput = document.getElementById('folder-import-input');
   const btnNew = document.getElementById('btn-new');
   const btnSave = document.getElementById('btn-save');
   const btnSaveAs = document.getElementById('btn-save-as');
@@ -197,14 +199,35 @@
   }
 
   function openDocumentModal() {
+    // Collect discovered files for quick-opening
+    let recentPills = '';
+    if (docSelector && docSelector.options.length > 1) {
+      const items = [];
+      for (let i = 1; i < docSelector.options.length && i <= 8; i++) {
+        const opt = docSelector.options[i];
+        items.push(`<button type="button" class="btn-action open-recent-pill" data-path="${opt.value}" style="font-size: 11px; padding: 4px 8px; border-radius: 4px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; cursor: pointer;">${opt.textContent}</button>`);
+      }
+      if (items.length > 0) {
+        recentPills = `
+          <div>
+            <label style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Recent Workspace Documents</label>
+            <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 6px; max-height: 140px; overflow-y: auto;">
+              ${items.join('')}
+            </div>
+          </div>
+          <div style="text-align: center; color: var(--text-muted); font-size: 11px; letter-spacing: 0.5px;">— OR —</div>
+        `;
+      }
+    }
+
     const bodyHtml = `
       <div style="display: flex; flex-direction: column; gap: 14px;">
         <div>
-          <button type="button" id="modal-btn-browse" class="btn-action primary" style="width: 100%; justify-content: center; padding: 10px; font-size: 14px;">
+          <button type="button" id="modal-btn-browse" class="btn-action primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer;">
             📂 Choose File from Computer (.docx, .odt, .md, .txt)
           </button>
         </div>
-        <div style="text-align: center; color: var(--text-muted); font-size: 11px; letter-spacing: 0.5px;">— OR ENTER FILE PATH DIRECTLY —</div>
+        ${recentPills}
         <div>
           <label for="open-doc-path">File Path on Disk</label>
           <input type="text" id="open-doc-path" placeholder="C:\\path\\to\\document.docx" style="width: 100%; margin-top: 6px;">
@@ -229,25 +252,65 @@
     const browseBtn = document.getElementById('modal-btn-browse');
     if (browseBtn) {
       browseBtn.addEventListener('click', () => {
-        fileImportInput.value = '';
-        fileImportInput.click();
+        if (fileImportInput) {
+          fileImportInput.value = '';
+          fileImportInput.click();
+        }
       });
     }
+
+    document.querySelectorAll('.open-recent-pill').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const p = btn.getAttribute('data-path');
+        if (p) {
+          closeModal();
+          await loadDocument(p);
+        }
+      });
+    });
   }
 
   function createNewDocument() {
-    const defaultDir = currentDocPath ? currentDocPath.substring(0, currentDocPath.lastIndexOf('\\') + 1) : '';
+    const defaultDir = currentDocPath ? currentDocPath.substring(0, currentDocPath.lastIndexOf('\\') + 1) : (knownDirectories[0] || 'C:\\Users\\critm\\.gemini\\antigravity\\scratch\\');
+
+    const quickDirs = [];
+    if (defaultDir) quickDirs.push({ label: 'Current Folder', path: defaultDir });
+    knownDirectories.forEach(d => {
+      if (d && d !== defaultDir && !quickDirs.some(q => q.path === d)) {
+        const segs = d.replace(/\\$/, '').split('\\');
+        const shortName = segs[segs.length - 1] || d;
+        quickDirs.push({ label: shortName, path: d.endsWith('\\') ? d : d + '\\' });
+      }
+    });
+
+    const pillsHtml = quickDirs.map(q => 
+      `<button type="button" class="btn-action dir-pill" data-dir="${q.path}" style="font-size: 11px; padding: 3px 8px; border-radius: 12px; margin-right: 4px; margin-bottom: 4px; cursor: pointer;">${q.label}</button>`
+    ).join('');
+
     const bodyHtml = `
-      <div>
-        <label for="new-doc-name">Document Title / File Name</label>
-        <input type="text" id="new-doc-name" value="New Document" style="width: 100%; margin-top: 6px;">
-      </div>
-      <div>
-        <label for="new-doc-format">Format</label>
-        <select id="new-doc-format" style="width: 100%; margin-top: 6px; padding: 6px; background: #0f172a; color: #fff; border: 1px solid #334155; border-radius: 4px;">
-          <option value="docx" ${currentDocFormat === 'docx' ? 'selected' : ''}>Microsoft Word (.docx)</option>
-          <option value="odt" ${currentDocFormat === 'odt' ? 'selected' : ''}>OpenDocument Text (.odt)</option>
-        </select>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div>
+          <label for="new-doc-folder">Destination Folder</label>
+          <div style="display: flex; gap: 6px; margin-top: 6px;">
+            <input type="text" id="new-doc-folder" value="${defaultDir}" style="flex: 1;">
+            <button type="button" id="btn-browse-new-folder" class="btn-action primary" style="white-space: nowrap; cursor: pointer;">📁 Browse Folder</button>
+          </div>
+          ${pillsHtml ? `<div style="margin-top: 8px; display: flex; flex-wrap: wrap;">${pillsHtml}</div>` : ''}
+        </div>
+        <div>
+          <label for="new-doc-name">Document Title / File Name</label>
+          <input type="text" id="new-doc-name" value="New Document" style="width: 100%; margin-top: 6px;">
+        </div>
+        <div>
+          <label for="new-doc-format">Format</label>
+          <select id="new-doc-format" style="width: 100%; margin-top: 6px; padding: 6px; background: #0f172a; color: #fff; border: 1px solid #334155; border-radius: 4px;">
+            <option value="docx" ${currentDocFormat === 'docx' ? 'selected' : ''}>Microsoft Word (.docx)</option>
+            <option value="odt" ${currentDocFormat === 'odt' ? 'selected' : ''}>OpenDocument Text (.odt)</option>
+          </select>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); word-break: break-all;" id="new-preview-path">
+          Full path: ${defaultDir}New Document.${currentDocFormat === 'docx' ? 'docx' : 'odt'}
+        </div>
       </div>
     `;
 
@@ -255,13 +318,16 @@
       title: 'Create New Document',
       bodyHtml: bodyHtml,
       onConfirm: async () => {
+        const folderInput = document.getElementById('new-doc-folder');
         const nameInput = document.getElementById('new-doc-name');
         const formatSelect = document.getElementById('new-doc-format');
+        let folder = folderInput ? folderInput.value.trim() : '';
         const title = (nameInput.value || 'New Document').trim();
         const ext = formatSelect.value;
         const sanitized = title.replace(/[^a-zA-Z0-9_\- ]/g, '').trim() || 'Document';
         const fileName = `${sanitized}.${ext}`;
-        const newPath = defaultDir ? `${defaultDir}${fileName}` : fileName;
+        if (folder && !folder.endsWith('\\') && !folder.endsWith('/')) folder += '\\';
+        const newPath = folder ? folder + fileName : fileName;
 
         try {
           const res = await fetch(`${API_BASE}/api/document`, {
@@ -280,10 +346,52 @@
           }
           await loadDocumentsList();
           await loadDocument(newPath);
+          return true;
         } catch (err) {
           alert(`Creation failed: ${err.message}`);
+          return false;
         }
       }
+    });
+
+    const folderInput = document.getElementById('new-doc-folder');
+    const nameInput = document.getElementById('new-doc-name');
+    const formatSelect = document.getElementById('new-doc-format');
+    const previewEl = document.getElementById('new-preview-path');
+    const updatePreview = () => {
+      let f = folderInput.value.trim();
+      let n = (nameInput.value || 'Document').trim().replace(/[^a-zA-Z0-9_\- ]/g, '') || 'Document';
+      let e = formatSelect.value;
+      if (f && !f.endsWith('\\') && !f.endsWith('/')) f += '\\';
+      if (previewEl) previewEl.textContent = `Full path: ${f}${n}.${e}`;
+    };
+    folderInput.addEventListener('input', updatePreview);
+    nameInput.addEventListener('input', updatePreview);
+    formatSelect.addEventListener('change', updatePreview);
+
+    const browseBtn = document.getElementById('btn-browse-new-folder');
+    if (browseBtn && folderImportInput) {
+      browseBtn.addEventListener('click', () => {
+        folderImportInput.onchange = (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (file && file.path) {
+            const dir = file.path.substring(0, file.path.lastIndexOf('\\') + 1);
+            if (dir) {
+              folderInput.value = dir;
+              updatePreview();
+            }
+          }
+        };
+        folderImportInput.value = '';
+        folderImportInput.click();
+      });
+    }
+
+    document.querySelectorAll('.dir-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        folderInput.value = pill.getAttribute('data-dir');
+        updatePreview();
+      });
     });
   }
 
@@ -291,13 +399,40 @@
     const ext = targetFormat.toLowerCase();
     const currentName = currentDocPath ? currentDocPath.substring(currentDocPath.lastIndexOf('\\') + 1) : 'document';
     const baseName = currentName.substring(0, currentName.lastIndexOf('.')) || currentName;
-    const defaultDir = currentDocPath ? currentDocPath.substring(0, currentDocPath.lastIndexOf('\\') + 1) : '';
-    const suggestedTarget = `${defaultDir}${baseName}_exported.${ext}`;
+    const defaultDir = currentDocPath ? currentDocPath.substring(0, currentDocPath.lastIndexOf('\\') + 1) : (knownDirectories[0] || 'C:\\Users\\critm\\.gemini\\antigravity\\scratch\\');
+    const suggestedFileName = `${baseName}_exported.${ext}`;
+
+    const quickDirs = [];
+    if (defaultDir) quickDirs.push({ label: 'Current Folder', path: defaultDir });
+    knownDirectories.forEach(d => {
+      if (d && d !== defaultDir && !quickDirs.some(q => q.path === d)) {
+        const segs = d.replace(/\\$/, '').split('\\');
+        const shortName = segs[segs.length - 1] || d;
+        quickDirs.push({ label: shortName, path: d.endsWith('\\') ? d : d + '\\' });
+      }
+    });
+
+    const pillsHtml = quickDirs.map(q => 
+      `<button type="button" class="btn-action dir-pill" data-dir="${q.path}" style="font-size: 11px; padding: 3px 8px; border-radius: 12px; margin-right: 4px; margin-bottom: 4px; cursor: pointer;">${q.label}</button>`
+    ).join('');
 
     const bodyHtml = `
-      <div>
-        <label for="export-target-path">Target File Path (${ext.toUpperCase()})</label>
-        <input type="text" id="export-target-path" value="${suggestedTarget}" style="width: 100%; margin-top: 6px;">
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div>
+          <label for="export-folder-path">Destination Folder</label>
+          <div style="display: flex; gap: 6px; margin-top: 6px;">
+            <input type="text" id="export-folder-path" value="${defaultDir}" style="flex: 1;">
+            <button type="button" id="btn-browse-export-folder" class="btn-action primary" style="white-space: nowrap; cursor: pointer;">📁 Browse Folder</button>
+          </div>
+          ${pillsHtml ? `<div style="margin-top: 8px; display: flex; flex-wrap: wrap;">${pillsHtml}</div>` : ''}
+        </div>
+        <div>
+          <label for="export-file-name">File Name</label>
+          <input type="text" id="export-file-name" value="${suggestedFileName}" style="width: 100%; margin-top: 6px;">
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); word-break: break-all;" id="export-preview-path">
+          Full path: ${defaultDir}${suggestedFileName}
+        </div>
       </div>
     `;
 
@@ -305,9 +440,14 @@
       title: `Export as ${ext.toUpperCase()}`,
       bodyHtml: bodyHtml,
       onConfirm: async () => {
-        const targetInput = document.getElementById('export-target-path');
-        const targetPath = targetInput.value.trim();
-        if (!targetPath) return false;
+        const folderInput = document.getElementById('export-folder-path');
+        const fileInput = document.getElementById('export-file-name');
+        let folder = (folderInput ? folderInput.value.trim() : '');
+        let fileName = (fileInput ? fileInput.value.trim() : '');
+        if (!fileName) return false;
+        if (!fileName.toLowerCase().endsWith('.' + ext)) fileName += '.' + ext;
+        if (folder && !folder.endsWith('\\') && !folder.endsWith('/')) folder += '\\';
+        const targetPath = folder ? folder + fileName : fileName;
 
         try {
           saveStatus.textContent = 'Exporting...';
@@ -332,12 +472,51 @@
             await loadDocumentsList();
             await loadDocument(targetPath);
           } else {
-            alert(`Document successfully exported to: ${targetPath}`);
+            alert(`Document successfully exported to:\n${targetPath}`);
           }
+          return true;
         } catch (err) {
           alert(`Export failed: ${err.message}`);
+          return false;
         }
       }
+    });
+
+    const folderInput = document.getElementById('export-folder-path');
+    const fileInput = document.getElementById('export-file-name');
+    const previewEl = document.getElementById('export-preview-path');
+    const updatePreview = () => {
+      let f = folderInput.value.trim();
+      let n = fileInput.value.trim();
+      if (f && !f.endsWith('\\') && !f.endsWith('/')) f += '\\';
+      if (previewEl) previewEl.textContent = `Full path: ${f}${n}`;
+    };
+    folderInput.addEventListener('input', updatePreview);
+    fileInput.addEventListener('input', updatePreview);
+
+    const browseBtn = document.getElementById('btn-browse-export-folder');
+    if (browseBtn && folderImportInput) {
+      browseBtn.addEventListener('click', () => {
+        folderImportInput.onchange = (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (file && file.path) {
+            const dir = file.path.substring(0, file.path.lastIndexOf('\\') + 1);
+            if (dir) {
+              folderInput.value = dir;
+              updatePreview();
+            }
+          }
+        };
+        folderImportInput.value = '';
+        folderImportInput.click();
+      });
+    }
+
+    document.querySelectorAll('.dir-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        folderInput.value = pill.getAttribute('data-dir');
+        updatePreview();
+      });
     });
   }
 
@@ -348,12 +527,18 @@
       const data = await res.json();
       docSelector.innerHTML = '<option value="">-- Choose document --</option>';
       if (data.files && Array.isArray(data.files)) {
+        const dirSet = new Set();
         data.files.forEach(f => {
+          if (f.path) {
+            const lastSlash = f.path.lastIndexOf('\\');
+            if (lastSlash > 0) dirSet.add(f.path.substring(0, lastSlash + 1));
+          }
           const opt = document.createElement('option');
           opt.value = f.path;
           opt.textContent = `[${f.format.toUpperCase()}] ${f.name}`;
           docSelector.appendChild(opt);
         });
+        knownDirectories = Array.from(dirSet);
       }
       if (currentDocPath) {
         docSelector.value = currentDocPath;
@@ -523,7 +708,43 @@
       if (file.path) {
         await loadDocument(file.path);
       } else {
-        alert(`Selected file: ${file.name}. Please enter its full path in the Open dialog so the document engine can read it directly from disk.`);
+        // Fallback: Upload binary file bytes to /api/import
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            saveStatus.textContent = 'Importing...';
+            const arrayBuffer = reader.result;
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+              binary += String.fromCharCode(bytes[i]);
+            }
+            const base64 = btoa(binary);
+
+            const res = await fetch(`${API_BASE}/api/import`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ filename: file.name, base64: base64 })
+            });
+
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.error || 'Failed to import document');
+            }
+
+            const doc = await res.json();
+            currentDocPath = doc.path;
+            currentDocTitle = doc.title || file.name;
+            docTitleInput.value = currentDocTitle;
+            updateFormatBadge(doc.format);
+            editorCanvas.innerHTML = doc.html || '<p></p>';
+            setDirty(false);
+            await loadDocumentsList();
+          } catch (err) {
+            alert(`Import failed: ${err.message}`);
+          }
+        };
+        reader.readAsArrayBuffer(file);
       }
     });
   }
@@ -620,6 +841,9 @@
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
       e.preventDefault();
       saveDocument();
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
+      e.preventDefault();
+      openDocumentModal();
     }
   });
 
