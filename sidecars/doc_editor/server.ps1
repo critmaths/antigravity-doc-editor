@@ -327,7 +327,8 @@ while ($running -and $listener.IsListening) {
 
         # API: Import Document from client (base64)
         if ($method -eq "POST" -and $urlPath -eq "/api/import") {
-            $reader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
+            $encoding = if ($request.ContentEncoding) { $request.ContentEncoding } else { [System.Text.Encoding]::UTF8 }
+            $reader = New-Object System.IO.StreamReader($request.InputStream, $encoding)
             $bodyText = $reader.ReadToEnd()
             $reader.Close()
 
@@ -344,7 +345,8 @@ while ($running -and $listener.IsListening) {
                     [void](New-Item -ItemType Directory -Path $scratchDir -Force)
                 }
                 $targetPath = Join-Path $scratchDir $filename
-                $fileBytes = [System.Convert]::FromBase64String($body.base64)
+                $cleanB64 = $body.base64 -replace '^data:[^;]+;base64,', ''
+                $fileBytes = [System.Convert]::FromBase64String($cleanB64)
                 [System.IO.File]::WriteAllBytes($targetPath, $fileBytes)
 
                 $doc = Convert-DocumentToHtml -DocPath $targetPath

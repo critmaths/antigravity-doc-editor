@@ -736,80 +736,96 @@
 
       closeModal();
 
-      // In Electron/Antigravity, File objects have a .path property
+      saveStatus.textContent = 'Importing...';
+      saveStatus.className = 'save-status saving';
+
+      // 1. Direct path if present (Electron)
       if (file.path && (file.path.toLowerCase().endsWith('.docx') || file.path.toLowerCase().endsWith('.odt'))) {
         await loadDocument(file.path);
         return;
       }
 
-      // Markdown or plain text import
+      // 2. Markdown or plain text import
       const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
       if (ext === '.md' || ext === '.markdown' || ext === '.txt') {
         const reader = new FileReader();
         reader.onload = () => {
-          const text = reader.result;
-          const lines = text.split(/\r?\n\r?\n/);
-          const html = lines.map(line => {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('# ')) return `<h1>${trimmed.slice(2)}</h1>`;
-            if (trimmed.startsWith('## ')) return `<h2>${trimmed.slice(3)}</h2>`;
-            if (trimmed.startsWith('### ')) return `<h3>${trimmed.slice(4)}</h3>`;
-            if (trimmed.startsWith('> ')) return `<blockquote>${trimmed.slice(2)}</blockquote>`;
-            return `<p>${trimmed.replace(/\n/g, '<br/>')}</p>`;
-          }).join('\n');
+          try {
+            const text = reader.result;
+            const lines = text.split(/\r?\n\r?\n/);
+            const html = lines.map(line => {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('# ')) return `<h1>${trimmed.slice(2)}</h1>`;
+              if (trimmed.startsWith('## ')) return `<h2>${trimmed.slice(3)}</h2>`;
+              if (trimmed.startsWith('### ')) return `<h3>${trimmed.slice(4)}</h3>`;
+              if (trimmed.startsWith('> ')) return `<blockquote>${trimmed.slice(2)}</blockquote>`;
+              return `<p>${trimmed.replace(/\n/g, '<br/>')}</p>`;
+            }).join('\n');
 
-          editorCanvas.innerHTML = html;
-          currentDocTitle = file.name.replace(/\.[^/.]+$/, '');
-          docTitleInput.value = currentDocTitle;
-          currentDocPath = file.path || '';
-          updateFormatBadge(ext.replace('.', ''));
-          setDirty(true);
+            editorCanvas.innerHTML = html;
+            currentDocTitle = file.name.replace(/\.[^/.]+$/, '');
+            docTitleInput.value = currentDocTitle;
+            currentDocPath = file.path || '';
+            updateFormatBadge(ext.replace('.', ''));
+            setDirty(true);
+            saveStatus.textContent = 'Loaded';
+            saveStatus.className = 'save-status';
+          } catch (err) {
+            saveStatus.textContent = 'Import failed';
+            saveStatus.className = 'save-status dirty';
+            openModal({ title: 'Import Failed', bodyHtml: `<p style="color: #ef4444;">${err.message}</p>` });
+          }
         };
         reader.readAsText(file);
         return;
       }
 
-      if (file.path) {
-        await loadDocument(file.path);
-      } else {
-        // Fallback: Upload binary file bytes to /api/import
-        const reader = new FileReader();
-        reader.onload = async () => {
-          try {
-            saveStatus.textContent = 'Importing...';
-            const arrayBuffer = reader.result;
-            const bytes = new Uint8Array(arrayBuffer);
-            let binary = '';
-            for (let i = 0; i < bytes.byteLength; i++) {
-              binary += String.fromCharCode(bytes[i]);
-            }
-            const base64 = btoa(binary);
+      // 3. Binary .docx or .odt via native FileReader.readAsDataURL (fast, non-blocking)
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const dataUrl = reader.result;
+          const base64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
 
-            const res = await fetch(`${API_BASE}/api/import`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ filename: file.name, base64: base64 })
-            });
+          const res = await fetch(`${API_BASE}/api/import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: file.name, base64: base64 })
+          });
 
-            if (!res.ok) {
-              const err = await res.json().catch(() => ({}));
-              throw new Error(err.error || 'Failed to import document');
-            }
-
-            const doc = await res.json();
-            currentDocPath = doc.path;
-            currentDocTitle = doc.title || file.name;
-            docTitleInput.value = currentDocTitle;
-            updateFormatBadge(doc.format);
-            editorCanvas.innerHTML = doc.html || '<p></p>';
-            setDirty(false);
-            await loadDocumentsList();
-          } catch (err) {
-            alert(`Import failed: ${err.message}`);
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `Server responded with status ${res.status}`);
           }
-        };
-        reader.readAsArrayBuffer(file);
-      }
+
+          const doc = await res.json();
+          currentDocPath = doc.path;
+          currentDocTitle = doc.title || file.name;
+          docTitleInput.value = currentDocTitle;
+          updateFormatBadge(doc.format);
+          editorCanvas.innerHTML = doc.html || '<p></p>';
+          setDirty(false);
+          saveStatus.textContent = 'Loaded';
+          saveStatus.className = 'save-status';
+          await loadDocumentsList();
+        } catch (err) {
+          saveStatus.textContent = 'Import failed';
+          saveStatus.className = 'save-status dirty';
+          openModal({
+            title: 'Import Failed',
+            bodyHtml: `<p style="color: #ef4444;">Failed to import document: ${err.message}</p>`
+          });
+        }
+      };
+      reader.onerror = () => {
+        saveStatus.textContent = 'Read failed';
+        saveStatus.className = 'save-status dirty';
+        openModal({
+          title: 'Read Error',
+          bodyHtml: '<p style="color: #ef4444;">Could not read the selected file from disk.</p>'
+        });
+      };
+      reader.readAsDataURL(file);
     });
   }
 

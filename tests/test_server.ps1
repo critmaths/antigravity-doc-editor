@@ -154,6 +154,22 @@ try {
     }
     Write-Host "GET /api/directories succeeded. Found $($dirsResp.quickLocations.Count) quick locations."
 
+    # Test 7: POST /api/import (base64 with data URL prefix)
+    $sampleBytes = [System.IO.File]::ReadAllBytes($TempDocx)
+    $b64 = "data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64," + [System.Convert]::ToBase64String($sampleBytes)
+    $importBody = @{
+        filename = "imported_test.docx"
+        base64 = $b64
+    } | ConvertTo-Json
+    $wc.Headers.Set("Content-Type", "application/json")
+    $importResult = $wc.UploadString("http://127.0.0.1:$TestPort/api/import", "POST", $importBody)
+    $importResp = $importResult | ConvertFrom-Json
+    if (-not $importResp.path -or -not (Test-Path $importResp.path)) {
+        Write-Error "FAIL: POST /api/import failed"
+    }
+    Remove-Item -Path $importResp.path -Force -ErrorAction SilentlyContinue
+    Write-Host "POST /api/import succeeded."
+
     Write-Host "PASS: Task 2 server tests passed!"
 } finally {
     try {
