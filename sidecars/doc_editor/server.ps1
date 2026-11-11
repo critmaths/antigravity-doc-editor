@@ -176,9 +176,16 @@ while ($running -and $listener.IsListening) {
             continue
         }
 
+        # API: Version check
+        if ($method -eq "GET" -and $urlPath -eq "/api/version") {
+            Send-JsonResponse -Response $response -Data @{ version = "2.3.0"; status = "ok" }
+            continue
+        }
+
         # API: Discover Directories for browsing
         if ($method -eq "GET" -and $urlPath -eq "/api/directories") {
             $dirPath = $request.QueryString["path"]
+            if ($dirPath) { $dirPath = $dirPath.Trim('"').Trim("'").Trim() }
             if (-not $dirPath -or -not (Test-Path $dirPath)) {
                 $dirPath = "$HOME\Documents"
                 if (-not (Test-Path $dirPath)) {
@@ -233,6 +240,7 @@ while ($running -and $listener.IsListening) {
         # API: Read Document
         if ($method -eq "GET" -and $urlPath -eq "/api/document") {
             $docPath = $request.QueryString["path"]
+            if ($docPath) { $docPath = $docPath.Trim('"').Trim("'").Trim() }
             if (-not $docPath) {
                 Send-JsonResponse -Response $response -Data @{ error = "Missing 'path' query parameter" } -StatusCode 400
                 continue
@@ -260,7 +268,8 @@ while ($running -and $listener.IsListening) {
 
         # API: Save or Create Document
         if ($method -eq "POST" -and $urlPath -eq "/api/document") {
-            $reader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
+            $encoding = if ($request.ContentEncoding) { $request.ContentEncoding } else { [System.Text.Encoding]::UTF8 }
+            $reader = New-Object System.IO.StreamReader($request.InputStream, $encoding)
             $bodyText = $reader.ReadToEnd()
             $reader.Close()
 
@@ -271,6 +280,7 @@ while ($running -and $listener.IsListening) {
 
             $body = $bodyText | ConvertFrom-Json
             $docPath = $body.path
+            if ($docPath) { $docPath = $docPath.Trim('"').Trim("'").Trim() }
 
             if (-not $docPath) {
                 Send-JsonResponse -Response $response -Data @{ error = "Missing 'path' property in request body" } -StatusCode 400
@@ -339,7 +349,9 @@ while ($running -and $listener.IsListening) {
 
             try {
                 $body = $bodyText | ConvertFrom-Json
-                $filename = if ($body.filename) { $body.filename } else { "imported_doc.docx" }
+                $rawFilename = if ($body.filename) { $body.filename.Trim('"').Trim("'").Trim() } else { "imported_doc.docx" }
+                $filename = [System.IO.Path]::GetFileName($rawFilename)
+                if (-not $filename) { $filename = "imported_doc.docx" }
                 $scratchDir = "$HOME\.gemini\antigravity\scratch"
                 if (-not (Test-Path $scratchDir)) {
                     [void](New-Item -ItemType Directory -Path $scratchDir -Force)
@@ -347,7 +359,19 @@ while ($running -and $listener.IsListening) {
                 $targetPath = Join-Path $scratchDir $filename
                 $cleanB64 = $body.base64 -replace '^data:[^;]+;base64,', ''
                 $fileBytes = [System.Convert]::FromBase64String($cleanB64)
-                [System.IO.File]::WriteAllBytes($targetPath, $fileBytes)
+
+                if (Test-Path $targetPath) {
+                    try {
+                        [System.IO.File]::WriteAllBytes($targetPath, $fileBytes)
+                    } catch {
+                        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($filename)
+                        $ext = [System.IO.Path]::GetExtension($filename)
+                        $targetPath = Join-Path $scratchDir "$($baseName)_$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())$ext"
+                        [System.IO.File]::WriteAllBytes($targetPath, $fileBytes)
+                    }
+                } else {
+                    [System.IO.File]::WriteAllBytes($targetPath, $fileBytes)
+                }
 
                 $doc = Convert-DocumentToHtml -DocPath $targetPath
                 Send-JsonResponse -Response $response -Data @{
@@ -377,6 +401,9 @@ while ($running -and $listener.IsListening) {
 
             $body = $bodyText | ConvertFrom-Json
             $targetPath = $body.targetPath
+            if ($targetPath) { $targetPath = $targetPath.Trim('"').Trim("'").Trim() }
+            $sourcePath = $body.sourcePath
+            if ($sourcePath) { $sourcePath = $sourcePath.Trim('"').Trim("'").Trim() }
 
             if (-not $targetPath) {
                 Send-JsonResponse -Response $response -Data @{ error = "Missing 'targetPath' in request body" } -StatusCode 400
@@ -384,7 +411,7 @@ while ($running -and $listener.IsListening) {
             }
 
             try {
-                Convert-DocumentFormat -SourcePath $body.sourcePath -TargetPath $targetPath -HtmlContent $body.html | Out-Null
+                Convert-DocumentFormat -SourcePath $sourcePath -TargetPath $targetPath -HtmlContent $body.html | Out-Null
                 $targetExt = [System.IO.Path]::GetExtension($targetPath).TrimStart(".").ToLower()
                 Send-JsonResponse -Response $response -Data @{
                     success = $true

@@ -20,7 +20,13 @@
   let defaultWorkingDir = '';
 
   // Helpers
+  function cleanPath(p) {
+    if (!p) return '';
+    return p.trim().replace(/^["']|["']$/g, '').trim();
+  }
+
   function getPathParts(filePath) {
+    filePath = cleanPath(filePath);
     if (!filePath) return { dir: '', name: '', base: '', ext: '' };
     const normalized = filePath.replace(/\\/g, '/');
     const lastSlash = normalized.lastIndexOf('/');
@@ -248,6 +254,7 @@
     let parentPath = '';
 
     async function loadDirectory(path) {
+      path = cleanPath(path);
       if (!explorerEl || explorerEl.classList.contains('hidden')) return;
       subfoldersList.innerHTML = '<div style="padding: 10px; color: var(--text-muted); font-size: 12px;">Loading folders...</div>';
 
@@ -287,20 +294,46 @@
         subfoldersList.innerHTML = '';
         const subs = data.subdirectories || [];
         if (subs.length === 0) {
-          subfoldersList.innerHTML = '<div style="padding: 10px; color: var(--text-muted); font-size: 12px;">No subfolders in this directory</div>';
+          subfoldersList.innerHTML = '<div style="padding: 10px; color: var(--text-muted); font-size: 12px;">No subfolders inside this folder (current folder selected).</div>';
         } else {
           subs.forEach(s => {
             const item = document.createElement('div');
-            item.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 4px; cursor: pointer; transition: background 0.1s ease; user-select: none;';
-            item.innerHTML = `<span style="font-size: 14px;">📁</span><span style="font-size: 12px; color: #f8fafc; font-weight: 500;">${s.name}</span>`;
-            item.addEventListener('mouseenter', () => item.style.background = '#334155');
-            item.addEventListener('mouseleave', () => item.style.background = 'transparent');
-            item.addEventListener('click', () => {
+            item.className = 'folder-item-row';
+            item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: 4px; cursor: pointer; transition: background 0.1s ease; border: 1px solid transparent; background: #1e293b; user-select: none;';
+            item.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; pointer-events: none;">
+                <span style="font-size: 14px;">📁</span>
+                <span style="font-size: 12px; color: #f8fafc; font-weight: 500; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${s.name}</span>
+              </div>
+              <div style="display: flex; gap: 4px;">
+                <button type="button" class="btn-action btn-folder-select" style="font-size: 10px; padding: 2px 8px; border-radius: 4px; background: #0284c7; color: #fff; cursor: pointer; border: none;">Select</button>
+                <button type="button" class="btn-action btn-folder-open" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; cursor: pointer;" title="Open folder contents">Open ➔</button>
+              </div>
+            `;
+            item.addEventListener('mouseenter', () => item.style.borderColor = '#38bdf8');
+            item.addEventListener('mouseleave', () => item.style.borderColor = 'transparent');
+
+            const selectFolder = (e) => {
+              if (e) e.stopPropagation();
+              const p = s.path.endsWith('\\') ? s.path : s.path + '\\';
+              folderInput.value = p;
+              updatePreview();
+              subfoldersList.querySelectorAll('.folder-item-row').forEach(r => r.style.background = '#1e293b');
+              item.style.background = '#0369a1';
+            };
+
+            const openFolder = (e) => {
+              if (e) e.stopPropagation();
               const p = s.path.endsWith('\\') ? s.path : s.path + '\\';
               folderInput.value = p;
               updatePreview();
               loadDirectory(s.path);
-            });
+            };
+
+            item.addEventListener('click', selectFolder);
+            item.addEventListener('dblclick', openFolder);
+            item.querySelector('.btn-folder-select').addEventListener('click', selectFolder);
+            item.querySelector('.btn-folder-open').addEventListener('click', openFolder);
             subfoldersList.appendChild(item);
           });
         }
@@ -348,9 +381,7 @@
               const p = q.path.endsWith('\\') ? q.path : q.path + '\\';
               folderInput.value = p;
               updatePreview();
-              if (!explorerEl.classList.contains('hidden')) {
-                loadDirectory(q.path);
-              }
+              loadDirectory(q.path);
             });
             pillsContainer.appendChild(btn);
           });
@@ -398,12 +429,18 @@
     openModal({
       title: 'Open / Import Document',
       bodyHtml: bodyHtml,
+      confirmText: 'Open',
       onConfirm: async () => {
         const pathInput = document.getElementById('open-doc-path');
-        const inputPath = pathInput ? pathInput.value.trim() : '';
+        const rawPath = pathInput ? pathInput.value.trim() : '';
+        const inputPath = cleanPath(rawPath);
         if (inputPath) {
-          await loadDocument(inputPath);
-          return true;
+          try {
+            await loadDocument(inputPath);
+            return true;
+          } catch {
+            return false;
+          }
         }
         return false;
       }
@@ -824,14 +861,23 @@
       saveStatus.className = 'save-status saving';
 
       // 1. Direct path if present (Electron)
-      if (file.path && (file.path.toLowerCase().endsWith('.docx') || file.path.toLowerCase().endsWith('.odt'))) {
-        await loadDocument(file.path);
-        return;
+      if (file.path && !file.path.includes('fakepath')) {
+        const cleanP = cleanPath(file.path);
+        const lowerP = cleanP.toLowerCase();
+        if (lowerP.endsWith('.docx') || lowerP.endsWith('.odt')) {
+          try {
+            await loadDocument(cleanP);
+            return;
+          } catch (err) {
+            console.warn('Direct path load failed, falling back to binary upload:', err);
+          }
+        }
       }
 
       // 2. Markdown or plain text import
       const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
       if (ext === '.md' || ext === '.markdown' || ext === '.txt') {
+        saveStatus.textContent = 'Reading text...';
         const reader = new FileReader();
         reader.onload = () => {
           try {
@@ -849,7 +895,7 @@
             editorCanvas.innerHTML = html;
             currentDocTitle = file.name.replace(/\.[^/.]+$/, '');
             docTitleInput.value = currentDocTitle;
-            currentDocPath = file.path || '';
+            currentDocPath = file.path ? cleanPath(file.path) : '';
             updateFormatBadge(ext.replace('.', ''));
             setDirty(true);
             saveStatus.textContent = 'Loaded';
@@ -857,7 +903,7 @@
           } catch (err) {
             saveStatus.textContent = 'Import failed';
             saveStatus.className = 'save-status dirty';
-            openModal({ title: 'Import Failed', bodyHtml: `<p style="color: #ef4444;">${err.message}</p>` });
+            showInfoModal('Import Failed', `<p style="color: #ef4444;">${err.message}</p>`, true);
           }
         };
         reader.readAsText(file);
@@ -865,9 +911,11 @@
       }
 
       // 3. Binary .docx or .odt via native FileReader.readAsDataURL (fast, non-blocking)
+      saveStatus.textContent = 'Reading file...';
       const reader = new FileReader();
       reader.onload = async () => {
         try {
+          saveStatus.textContent = 'Uploading...';
           const dataUrl = reader.result;
           const base64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
 
@@ -882,6 +930,7 @@
             throw new Error(err.error || `Server responded with status ${res.status}`);
           }
 
+          saveStatus.textContent = 'Rendering...';
           const doc = await res.json();
           currentDocPath = doc.path;
           currentDocTitle = doc.title || file.name;
@@ -895,19 +944,13 @@
         } catch (err) {
           saveStatus.textContent = 'Import failed';
           saveStatus.className = 'save-status dirty';
-          openModal({
-            title: 'Import Failed',
-            bodyHtml: `<p style="color: #ef4444;">Failed to import document: ${err.message}</p>`
-          });
+          showInfoModal('Import Failed', `<p style="color: #ef4444;">Failed to import document: ${err.message}</p>`, true);
         }
       };
       reader.onerror = () => {
         saveStatus.textContent = 'Read failed';
         saveStatus.className = 'save-status dirty';
-        openModal({
-          title: 'Read Error',
-          bodyHtml: '<p style="color: #ef4444;">Could not read the selected file from disk.</p>'
-        });
+        showInfoModal('Read Error', '<p style="color: #ef4444;">Could not read the selected file from disk.</p>', true);
       };
       reader.readAsDataURL(file);
     });
