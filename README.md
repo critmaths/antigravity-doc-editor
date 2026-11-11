@@ -8,6 +8,10 @@
 
 > An embedded **WYSIWYG document editor and viewer** for **Google Antigravity**. Read, edit, format, and convert **Microsoft Word (`.docx`)** and **OpenDocument Text (`.odt`)** files directly in your IDE auxiliary pane with live disk synchronization and Markdown export.
 
+<p align="center">
+  <img src="docs/screenshot.jpg" alt="Antigravity Document Editor Screenshot" width="850">
+</p>
+
 ---
 
 ## 💡 Why This Exists
