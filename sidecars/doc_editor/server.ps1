@@ -365,7 +365,8 @@ while ($running -and $listener.IsListening) {
 
         # API: Convert Format / Export
         if ($method -eq "POST" -and $urlPath -eq "/api/convert") {
-            $reader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
+            $encoding = if ($request.ContentEncoding) { $request.ContentEncoding } else { [System.Text.Encoding]::UTF8 }
+            $reader = New-Object System.IO.StreamReader($request.InputStream, $encoding)
             $bodyText = $reader.ReadToEnd()
             $reader.Close()
 

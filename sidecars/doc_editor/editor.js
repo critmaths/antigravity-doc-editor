@@ -17,6 +17,20 @@
   let isSaving = false;
   let modalConfirmCallback = null;
   let knownDirectories = [];
+  let defaultWorkingDir = '';
+
+  // Helpers
+  function getPathParts(filePath) {
+    if (!filePath) return { dir: '', name: '', base: '', ext: '' };
+    const normalized = filePath.replace(/\\/g, '/');
+    const lastSlash = normalized.lastIndexOf('/');
+    const dir = lastSlash >= 0 ? filePath.substring(0, lastSlash + 1) : '';
+    const name = lastSlash >= 0 ? filePath.substring(lastSlash + 1) : filePath;
+    const lastDot = name.lastIndexOf('.');
+    const base = lastDot >= 0 ? name.substring(0, lastDot) : name;
+    const ext = lastDot >= 0 ? name.substring(lastDot + 1).toLowerCase() : '';
+    return { dir, name, base, ext };
+  }
 
   // DOM Elements
   const docTitleInput = document.getElementById('doc-title');
@@ -68,6 +82,12 @@
     modalTitle.textContent = options.title || 'Dialog';
     modalBody.innerHTML = options.bodyHtml || '';
     modalConfirmCallback = options.onConfirm || null;
+    modalConfirm.textContent = options.confirmText || 'Confirm';
+    if (options.hideCancel) {
+      modalCancel.style.display = 'none';
+    } else {
+      modalCancel.style.display = '';
+    }
     modalOverlay.classList.remove('hidden');
 
     const firstInput = modalBody.querySelector('input, select');
@@ -80,13 +100,32 @@
     modalOverlay.classList.add('hidden');
     modalBody.innerHTML = '';
     modalConfirmCallback = null;
+    modalCancel.style.display = '';
+    modalConfirm.textContent = 'Confirm';
+    modalConfirm.disabled = false;
   }
 
-  modalConfirm.addEventListener('click', () => {
+  function showInfoModal(title, bodyHtml, isError = false) {
+    openModal({
+      title: title,
+      bodyHtml: `<div style="font-size: 13px; line-height: 1.6; color: ${isError ? '#ef4444' : '#e2e8f0'};">${bodyHtml}</div>`,
+      confirmText: 'OK',
+      hideCancel: true
+    });
+  }
+
+  modalConfirm.addEventListener('click', async () => {
     if (modalConfirmCallback) {
-      const shouldClose = modalConfirmCallback();
-      if (shouldClose !== false) {
-        closeModal();
+      modalConfirm.disabled = true;
+      try {
+        const shouldClose = await modalConfirmCallback();
+        if (shouldClose !== false) {
+          closeModal();
+        }
+      } catch (err) {
+        console.error('Modal action error:', err);
+      } finally {
+        modalConfirm.disabled = false;
       }
     } else {
       closeModal();
@@ -150,8 +189,9 @@
         docSelector.value = currentDocPath;
       }
     } catch (err) {
-      alert(`Error loading document: ${err.message}`);
+      showInfoModal('Load Error', `<p style="color: #ef4444;">Error loading document: ${err.message}</p>`, true);
       saveStatus.textContent = 'Load error';
+      saveStatus.className = 'save-status dirty';
     }
   }
 
@@ -190,7 +230,7 @@
         if (!isDirty) saveStatus.textContent = 'Saved';
       }, 2500);
     } catch (err) {
-      alert(`Save failed: ${err.message}`);
+      showInfoModal('Save Error', `<p style="color: #ef4444;">Failed to save document: ${err.message}</p>`, true);
       saveStatus.textContent = 'Save failed';
       saveStatus.className = 'save-status dirty';
     } finally {
@@ -391,7 +431,8 @@
   }
 
   function createNewDocument() {
-    const defaultDir = currentDocPath ? currentDocPath.substring(0, currentDocPath.lastIndexOf('\\') + 1) : 'C:\\Users\\critm\\.gemini\\antigravity\\scratch\\';
+    const parts = getPathParts(currentDocPath);
+    const defaultDir = parts.dir || defaultWorkingDir || '';
 
     const bodyHtml = `
       <div id="new-dialog-container" style="display: flex; flex-direction: column; gap: 12px;">
@@ -431,6 +472,7 @@
     openModal({
       title: 'Create New Document',
       bodyHtml: bodyHtml,
+      confirmText: 'Create',
       onConfirm: async () => {
         const folderInput = document.getElementById('new-doc-folder');
         const nameInput = document.getElementById('new-doc-name');
@@ -444,6 +486,8 @@
         const newPath = folder ? folder + fileName : fileName;
 
         try {
+          saveStatus.textContent = 'Creating...';
+          saveStatus.className = 'save-status saving';
           const res = await fetch(`${API_BASE}/api/document`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -458,11 +502,15 @@
             const err = await res.json().catch(() => ({}));
             throw new Error(err.error || 'Failed to create new document');
           }
+          saveStatus.textContent = 'Created';
+          saveStatus.className = 'save-status';
           await loadDocumentsList();
           await loadDocument(newPath);
           return true;
         } catch (err) {
-          alert(`Creation failed: ${err.message}`);
+          saveStatus.textContent = 'Creation failed';
+          saveStatus.className = 'save-status dirty';
+          showInfoModal('Creation Failed', `<p style="color: #ef4444;">Failed to create document: ${err.message}</p>`, true);
           return false;
         }
       }
@@ -489,10 +537,21 @@
 
   function convertDocument(targetFormat) {
     const ext = targetFormat.toLowerCase();
-    const currentName = currentDocPath ? currentDocPath.substring(currentDocPath.lastIndexOf('\\') + 1) : 'document';
-    const baseName = currentName.substring(0, currentName.lastIndexOf('.')) || currentName;
-    const defaultDir = currentDocPath ? currentDocPath.substring(0, currentDocPath.lastIndexOf('\\') + 1) : 'C:\\Users\\critm\\.gemini\\antigravity\\scratch\\';
+    const parts = getPathParts(currentDocPath);
+    const titleClean = (docTitleInput && docTitleInput.value ? docTitleInput.value : currentDocTitle)
+      .trim().replace(/[^a-zA-Z0-9_\- ]/g, '');
+    const baseName = titleClean || parts.base || 'document';
+    const defaultDir = parts.dir || defaultWorkingDir || '';
     const suggestedFileName = `${baseName}_exported.${ext}`;
+
+    const formatLabels = {
+      docx: 'Word Document (.docx)',
+      odt: 'OpenDocument Text (.odt)',
+      md: 'Markdown (.md)',
+      html: 'HTML Webpage (.html)',
+      txt: 'Plain Text (.txt)'
+    };
+    const formatLabel = formatLabels[ext] || `.${ext.toUpperCase()}`;
 
     const bodyHtml = `
       <div id="export-dialog-container" style="display: flex; flex-direction: column; gap: 12px;">
@@ -523,20 +582,25 @@
     `;
 
     openModal({
-      title: `Export as ${ext.toUpperCase()}`,
+      title: `Export as ${formatLabel}`,
       bodyHtml: bodyHtml,
+      confirmText: 'Export',
       onConfirm: async () => {
         const folderInput = document.getElementById('export-folder-path');
         const fileInput = document.getElementById('export-file-name');
         let folder = (folderInput ? folderInput.value.trim() : '');
         let fileName = (fileInput ? fileInput.value.trim() : '');
-        if (!fileName) return false;
+        if (!fileName) {
+          showInfoModal('Missing File Name', '<p style="color: #ef4444;">Please provide a file name for the export.</p>', true);
+          return false;
+        }
         if (!fileName.toLowerCase().endsWith('.' + ext)) fileName += '.' + ext;
         if (folder && !folder.endsWith('\\') && !folder.endsWith('/')) folder += '\\';
         const targetPath = folder ? folder + fileName : fileName;
 
         try {
           saveStatus.textContent = 'Exporting...';
+          saveStatus.className = 'save-status saving';
           const res = await fetch(`${API_BASE}/api/convert`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -550,19 +614,39 @@
 
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || 'Failed to convert document');
+            throw new Error(err.error || `Server responded with ${res.status}`);
           }
 
           saveStatus.textContent = 'Exported!';
+          saveStatus.className = 'save-status';
+          setTimeout(() => {
+            if (!isDirty) saveStatus.textContent = 'Saved';
+          }, 3000);
+
           if (ext === 'docx' || ext === 'odt') {
             await loadDocumentsList();
             await loadDocument(targetPath);
           } else {
-            alert(`Document successfully exported to:\n${targetPath}`);
+            showInfoModal(
+              'Export Successful',
+              `<div style="display: flex; flex-direction: column; gap: 8px;">
+                <p>Document exported successfully as <strong>${formatLabel}</strong>.</p>
+                <div style="background: #0f172a; padding: 8px 10px; border-radius: 4px; font-family: monospace; font-size: 11px; color: #38bdf8; word-break: break-all;">
+                  ${targetPath}
+                </div>
+              </div>`,
+              false
+            );
           }
           return true;
         } catch (err) {
-          alert(`Export failed: ${err.message}`);
+          saveStatus.textContent = 'Export failed';
+          saveStatus.className = 'save-status dirty';
+          showInfoModal(
+            'Export Failed',
+            `<p style="color: #ef4444;">Failed to export document: ${err.message}</p>`,
+            true
+          );
           return false;
         }
       }
@@ -931,6 +1015,14 @@
   // Initialization
   // ===========================================================================
   async function init() {
+    fetch(`${API_BASE}/api/directories`)
+      .then(r => r.json())
+      .then(d => {
+        if (d && d.current) {
+          defaultWorkingDir = d.current.endsWith('\\') ? d.current : d.current + '\\';
+        }
+      }).catch(() => {});
+
     await loadDocumentsList();
 
     const params = new URLSearchParams(window.location.search);

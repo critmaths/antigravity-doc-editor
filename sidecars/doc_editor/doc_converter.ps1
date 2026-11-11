@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Unified Office Document Converter for Antigravity Document Editor (doc-editor).
     Provides bidirectional conversion between OpenDocument Text (.odt),
@@ -1539,6 +1539,22 @@ function Convert-DocumentFormat {
         $mdText = Convert-HtmlToMarkdown -HtmlContent $HtmlContent
         $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
         [System.IO.File]::WriteAllText($TargetPath, $mdText, $utf8NoBom)
+        return $true
+    }
+    elseif ($targetExt -in @(".html", ".htm")) {
+        $docTitle = [System.IO.Path]::GetFileNameWithoutExtension($TargetPath)
+        $fullHtml = "<!DOCTYPE html>`n<html>`n<head>`n<meta charset=`"utf-8`">`n<title>$docTitle</title>`n<style>`nbody { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #1e293b; }`nh1, h2, h3 { color: #0f172a; }`nblockquote { border-left: 3px solid #cbd5e1; margin-left: 0; padding-left: 1rem; color: #64748b; }`ntable { border-collapse: collapse; width: 100%; margin: 16px 0; }`nth, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }`nth { background: #f1f5f9; font-weight: 600; }`n</style>`n</head>`n<body>`n$HtmlContent`n</body>`n</html>"
+        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllText($TargetPath, $fullHtml, $utf8NoBom)
+        return $true
+    }
+    elseif ($targetExt -in @(".txt", ".text")) {
+        $text = [System.Text.RegularExpressions.Regex]::Replace($HtmlContent, "<br\s*/?>", "`n")
+        $text = [System.Text.RegularExpressions.Regex]::Replace($text, "</(p|h[1-6]|li|tr|blockquote)>", "`n`n")
+        $text = [System.Text.RegularExpressions.Regex]::Replace($text, "<[^>]+>", " ")
+        $decoded = [System.Net.WebUtility]::HtmlDecode($text).Trim()
+        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllText($TargetPath, $decoded, $utf8NoBom)
         return $true
     }
     else {

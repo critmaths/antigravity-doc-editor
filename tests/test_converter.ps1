@@ -124,6 +124,27 @@ try {
         Write-Error "FAIL: Exported Markdown missing expected content"
     }
 
+    $ConvertedHtml = Join-Path $ScriptDir "converter_test.html"
+    $ConvertedTxt = Join-Path $ScriptDir "converter_test.txt"
+    $conv4 = Convert-DocumentFormat -SourcePath $TempDocx -TargetPath $ConvertedHtml -HtmlContent $richHtml
+    if ($conv4 -ne $true -or -not (Test-Path $ConvertedHtml)) {
+        Write-Error "FAIL: Export to HTML failed"
+    }
+    $htmlText = Get-Content $ConvertedHtml -Raw
+    if ($htmlText -notmatch "<!DOCTYPE html>" -or $htmlText -notmatch "Project Vision") {
+        Write-Error "FAIL: Exported HTML missing expected content"
+    }
+
+    $conv5 = Convert-DocumentFormat -SourcePath $TempDocx -TargetPath $ConvertedTxt -HtmlContent $richHtml
+    if ($conv5 -ne $true -or -not (Test-Path $ConvertedTxt)) {
+        Write-Error "FAIL: Export to Plain Text failed"
+    }
+    $plainText = Get-Content $ConvertedTxt -Raw
+    if ($plainText -notmatch "Project Vision") {
+        Write-Error "FAIL: Exported Plain Text missing expected content"
+    }
+    Remove-Item -Path $ConvertedHtml, $ConvertedTxt -Force -ErrorAction SilentlyContinue
+
     Write-Host "=== 4. Testing New-BlankDocument ==="
     $blankCreated = New-BlankDocument -DocPath $BlankDocx -Title "Fresh Spec"
     if (-not $blankCreated -or -not (Test-Path $BlankDocx)) {

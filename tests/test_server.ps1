@@ -144,7 +144,38 @@ try {
     if (-not $convertResp2.success -or -not (Test-Path $ConvertedMd)) {
         Write-Error "FAIL: POST /api/convert export to Markdown failed"
     }
-    Write-Host "POST /api/convert succeeded for both format conversion and Markdown export."
+
+    # Test 5b: POST /api/convert HTML and TXT export
+    $ConvertedHtml = Join-Path $ScriptDir "converted_test.html"
+    $ConvertedTxt = Join-Path $ScriptDir "converted_test.txt"
+    if (Test-Path $ConvertedHtml) { Remove-Item -Path $ConvertedHtml -Force }
+    if (Test-Path $ConvertedTxt) { Remove-Item -Path $ConvertedTxt -Force }
+    $convertBodyHtml = @{
+        html = "<h1>HTML Page</h1><p>Rich web text</p>"
+        targetPath = $ConvertedHtml
+        format = "html"
+    } | ConvertTo-Json
+    $wc.Headers.Set("Content-Type", "application/json")
+    $convertResultHtml = $wc.UploadString("http://127.0.0.1:$TestPort/api/convert", "POST", $convertBodyHtml)
+    $convertRespHtml = $convertResultHtml | ConvertFrom-Json
+    if (-not $convertRespHtml.success -or -not (Test-Path $ConvertedHtml)) {
+        Write-Error "FAIL: POST /api/convert export to HTML failed"
+    }
+
+    $convertBodyTxt = @{
+        html = "<h1>Plain Title</h1><p>Line of text</p>"
+        targetPath = $ConvertedTxt
+        format = "txt"
+    } | ConvertTo-Json
+    $wc.Headers.Set("Content-Type", "application/json")
+    $convertResultTxt = $wc.UploadString("http://127.0.0.1:$TestPort/api/convert", "POST", $convertBodyTxt)
+    $convertRespTxt = $convertResultTxt | ConvertFrom-Json
+    if (-not $convertRespTxt.success -or -not (Test-Path $ConvertedTxt)) {
+        Write-Error "FAIL: POST /api/convert export to Plain Text failed"
+    }
+
+    Remove-Item -Path $ConvertedHtml, $ConvertedTxt -Force -ErrorAction SilentlyContinue
+    Write-Host "POST /api/convert succeeded for Word, ODT, Markdown, HTML, and Plain Text export."
 
     # Test 6: GET /api/directories
     $dirsJson = $wc.DownloadString("http://127.0.0.1:$TestPort/api/directories")
