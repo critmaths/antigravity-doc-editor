@@ -22,6 +22,8 @@
   const docFormatBadge = document.getElementById('doc-format-badge');
   const docSelector = document.getElementById('doc-selector');
   const saveStatus = document.getElementById('save-status');
+  const btnOpen = document.getElementById('btn-open');
+  const fileImportInput = document.getElementById('file-import-input');
   const btnNew = document.getElementById('btn-new');
   const btnSave = document.getElementById('btn-save');
   const btnSaveAs = document.getElementById('btn-save-as');
@@ -191,6 +193,45 @@
       saveStatus.className = 'save-status dirty';
     } finally {
       isSaving = false;
+    }
+  }
+
+  function openDocumentModal() {
+    const bodyHtml = `
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div>
+          <button type="button" id="modal-btn-browse" class="btn-action primary" style="width: 100%; justify-content: center; padding: 10px; font-size: 14px;">
+            📂 Choose File from Computer (.docx, .odt, .md, .txt)
+          </button>
+        </div>
+        <div style="text-align: center; color: var(--text-muted); font-size: 11px; letter-spacing: 0.5px;">— OR ENTER FILE PATH DIRECTLY —</div>
+        <div>
+          <label for="open-doc-path">File Path on Disk</label>
+          <input type="text" id="open-doc-path" placeholder="C:\\path\\to\\document.docx" style="width: 100%; margin-top: 6px;">
+        </div>
+      </div>
+    `;
+
+    openModal({
+      title: 'Open / Import Document',
+      bodyHtml: bodyHtml,
+      onConfirm: async () => {
+        const pathInput = document.getElementById('open-doc-path');
+        const inputPath = pathInput ? pathInput.value.trim() : '';
+        if (inputPath) {
+          await loadDocument(inputPath);
+          return true;
+        }
+        return false;
+      }
+    });
+
+    const browseBtn = document.getElementById('modal-btn-browse');
+    if (browseBtn) {
+      browseBtn.addEventListener('click', () => {
+        fileImportInput.value = '';
+        fileImportInput.click();
+      });
     }
   }
 
@@ -434,8 +475,58 @@
   });
 
   // Action buttons
+  if (btnOpen) btnOpen.addEventListener('click', openDocumentModal);
   btnNew.addEventListener('click', createNewDocument);
   btnSave.addEventListener('click', saveDocument);
+
+  // File import input
+  if (fileImportInput) {
+    fileImportInput.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      closeModal();
+
+      // In Electron/Antigravity, File objects have a .path property
+      if (file.path && (file.path.toLowerCase().endsWith('.docx') || file.path.toLowerCase().endsWith('.odt'))) {
+        await loadDocument(file.path);
+        return;
+      }
+
+      // Markdown or plain text import
+      const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      if (ext === '.md' || ext === '.markdown' || ext === '.txt') {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const text = reader.result;
+          const lines = text.split(/\r?\n\r?\n/);
+          const html = lines.map(line => {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('# ')) return `<h1>${trimmed.slice(2)}</h1>`;
+            if (trimmed.startsWith('## ')) return `<h2>${trimmed.slice(3)}</h2>`;
+            if (trimmed.startsWith('### ')) return `<h3>${trimmed.slice(4)}</h3>`;
+            if (trimmed.startsWith('> ')) return `<blockquote>${trimmed.slice(2)}</blockquote>`;
+            return `<p>${trimmed.replace(/\n/g, '<br/>')}</p>`;
+          }).join('\n');
+
+          editorCanvas.innerHTML = html;
+          currentDocTitle = file.name.replace(/\.[^/.]+$/, '');
+          docTitleInput.value = currentDocTitle;
+          currentDocPath = file.path || '';
+          updateFormatBadge(ext.replace('.', ''));
+          setDirty(true);
+        };
+        reader.readAsText(file);
+        return;
+      }
+
+      if (file.path) {
+        await loadDocument(file.path);
+      } else {
+        alert(`Selected file: ${file.name}. Please enter its full path in the Open dialog so the document engine can read it directly from disk.`);
+      }
+    });
+  }
 
   // Export dropdown
   btnSaveAs.addEventListener('click', (e) => {
@@ -555,6 +646,7 @@
   window.saveDocument = saveDocument;
   window.convertDocument = convertDocument;
   window.createNewDocument = createNewDocument;
+  window.openDocumentModal = openDocumentModal;
   window.openModal = openModal;
   window.closeModal = closeModal;
   window.insertLink = insertLink;

@@ -20,7 +20,7 @@ $jsContent = Get-Content $JsFile -Raw
 # Check required UI elements in ui.html
 $requiredIds = @(
     "doc-title", "doc-format-badge", "doc-selector", "save-status",
-    "btn-new", "btn-save", "btn-save-as", "save-as-menu",
+    "btn-open", "file-import-input", "btn-new", "btn-save", "btn-save-as", "save-as-menu",
     "heading-select", "font-family-select", "font-size-select",
     "btn-bold", "btn-italic", "btn-underline", "btn-strike",
     "color-picker", "highlight-picker",
@@ -57,7 +57,7 @@ foreach ($sel in $requiredSelectors) {
 
 # Check essential JS functions in editor.js
 $requiredJs = @(
-    "loadDocument", "saveDocument", "convertDocument", "createNewDocument",
+    "loadDocument", "saveDocument", "convertDocument", "createNewDocument", "openDocumentModal",
     "openModal", "closeModal", "insertLink", "insertTable", "updateToolbarState"
 )
 foreach ($fn in $requiredJs) {

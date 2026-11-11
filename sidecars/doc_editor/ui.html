@@ -27,6 +27,7 @@
       </div>
       <div class="header-right">
         <span id="save-status" class="save-status">Saved</span>
+        <button id="btn-open" class="btn-action" title="Open or Import Document">&#x1F4C2; Open</button>
         <button id="btn-new" class="btn-action" title="Create New Document">&#x2795; New</button>
         <button id="btn-save" class="btn-action primary" title="Save Document (Ctrl+S)">&#x1F4BE; Save</button>
         <div class="dropdown-wrapper">
@@ -37,6 +38,7 @@
             <button type="button" class="dropdown-item" data-export="md">&#x2193; Export as Markdown (.md)</button>
           </div>
         </div>
+        <input type="file" id="file-import-input" accept=".docx,.odt,.md,.markdown,.txt" style="display:none">
       </div>
     </header>
 
