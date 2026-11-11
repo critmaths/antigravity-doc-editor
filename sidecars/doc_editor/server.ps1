@@ -6,10 +6,17 @@
 #>
 
 param(
-    [int]$Port = 58912
+    [int]$Port = 0
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($env:ANTIGRAVITY_SIDECAR_WEB_PORT) {
+    try { $Port = [int]$env:ANTIGRAVITY_SIDECAR_WEB_PORT } catch {}
+}
+if (-not $Port -or $Port -eq 0) {
+    $Port = 58912
+}
 
 # Dot-source the unified converter
 $ConverterScript = Join-Path $PSScriptRoot "doc_converter.ps1"
@@ -123,13 +130,29 @@ while ($running -and $listener.IsListening) {
             $searchRoots += (Get-Location).Path
             $searchRoots += (Split-Path -Parent (Get-Location).Path)
             $searchRoots += "$HOME\.gemini\antigravity\scratch"
-            $searchRoots += "$HOME\Documents"
-            $searchRoots += "$HOME\Desktop"
 
             foreach ($root in $searchRoots) {
                 if ($root -and (Test-Path $root)) {
                     try {
-                        $files = Get-ChildItem -Path $root -Include *.odt, *.docx -File -Recurse -Depth 3 -ErrorAction SilentlyContinue
+                        $files = Get-ChildItem -Path $root -Include *.odt, *.docx -File -Recurse -Depth 2 -ErrorAction SilentlyContinue
+                        foreach ($f in $files) {
+                            $ext = $f.Extension.TrimStart(".").ToLower()
+                            $foundFiles += [PSCustomObject]@{
+                                name = $f.Name
+                                path = $f.FullName
+                                format = $ext
+                                size = $f.Length
+                                lastModified = $f.LastWriteTime.ToString("o")
+                            }
+                        }
+                    } catch {}
+                }
+            }
+
+            foreach ($shallow in @("$HOME\Documents", "$HOME\Desktop")) {
+                if ($shallow -and (Test-Path $shallow)) {
+                    try {
+                        $files = Get-ChildItem -Path $shallow -Include *.odt, *.docx -File -ErrorAction SilentlyContinue
                         foreach ($f in $files) {
                             $ext = $f.Extension.TrimStart(".").ToLower()
                             $foundFiles += [PSCustomObject]@{

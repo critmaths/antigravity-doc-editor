@@ -1,18 +1,19 @@
 {
   "name": "doc_editor",
+  "display_name": "Antigravity Document Editor",
+  "description": "Interactive visual document editor and viewer for Microsoft Word (.docx) and OpenDocument Text (.odt)",
   "command": "powershell",
   "args": [
     "-NoProfile",
     "-ExecutionPolicy",
     "Bypass",
     "-File",
-    "sidecars/doc_editor/server.ps1",
-    "-Port",
-    "58912"
+    "server.ps1"
   ],
-  "port": 58912,
   "has_web_ui": true,
+  "restart_policy": "always",
   "ui_config": {
+    "display_name": "Antigravity Document Editor",
     "views": [
       {
         "title": "Document Editor",
